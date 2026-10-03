@@ -12,9 +12,8 @@ import '../storage/local_db.dart';
 ///   Not started -> (user sends papers) Submitted -> Under review -> Approved
 ///
 /// After the papers are sent, the status stays at "Submitted" until the
-/// OSCA office changes it. That change will come from the server (your
-/// SCMS admin app) when the backend is connected: replace [_advanceIfDue]
-/// with a call that asks the server for the latest status.
+/// OSCA office changes it. When the backend is connected, [load] asks the
+/// server (your SCMS admin app) for the latest status.
 ///
 /// For testing only, [simulateOscaReview] can be set to true. The app then
 /// pretends to be the OSCA office and moves the application forward by
@@ -65,6 +64,11 @@ class ApplicationRepository extends ChangeNotifier {
   int get unreadCount => _notifications.where((n) => !n.read).length;
   bool get loading => _loading;
 
+  /// The backend has no "cancel", so only offline applications can be
+  /// taken back from the app.
+  bool get canCancel =>
+      !_api.isConnected && _status.stage == ApplicationStage.submitted;
+
   /// Set when the last refresh failed (the saved copy is still shown).
   String? get error => _error;
 
@@ -86,6 +90,7 @@ class ApplicationRepository extends ChangeNotifier {
               .toList(),
         );
       }
+      if (_api.isConnected) await _refreshStatus();
       _error = null;
     } catch (_) {
       _error = 'No internet. Showing the information saved on this phone.';
@@ -164,6 +169,34 @@ class ApplicationRepository extends ChangeNotifier {
   void dispose() {
     _timer?.cancel();
     super.dispose();
+  }
+
+  // ---------------------------------------------------------------------------
+  // Status from the server (the OSCA office's decision)
+  // ---------------------------------------------------------------------------
+
+  static const _stageNotices = {
+    ApplicationStage.approved: (
+      'Application approved',
+      'Congratulations! Your Senior Citizen ID application was approved.',
+    ),
+    ApplicationStage.needsAction: (
+      'Please fix your papers',
+      'The OSCA office needs you to send some papers again. Open your '
+          'application to see what to do.',
+    ),
+  };
+
+  Future<void> _refreshStatus() async {
+    final data = await _api.get('/application');
+    if (data is! Map) return;
+    final fresh = ApplicationStatus.fromJson(Map<String, dynamic>.from(data));
+    final previous = _status.stage;
+    _status = fresh;
+    final notice = _stageNotices[fresh.stage];
+    if (notice != null && fresh.stage != previous) {
+      _addNotification(notice.$1, notice.$2, fresh.updatedAt ?? _clock());
+    }
   }
 
   // ---------------------------------------------------------------------------

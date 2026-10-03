@@ -7,7 +7,14 @@ import 'package:http/http.dart' as http;
 
 class ApiException implements Exception {
   final String message;
-  const ApiException(this.message);
+
+  /// The server's reason, e.g. "wrong_code" or "expired" (if it sent one).
+  final String? code;
+
+  /// HTTP status, or null when the server could not be reached.
+  final int? statusCode;
+
+  const ApiException(this.message, {this.code, this.statusCode});
 
   @override
   String toString() => message;
@@ -15,10 +22,11 @@ class ApiException implements Exception {
 
 /// Talks to "the server".
 ///
-/// Addresses in [_remotePaths] come from the SCMS backend (Laravel) at
-/// [baseUrl]/api/mobile when [baseUrl] is set. Everything else, or
-/// everything when [baseUrl] is empty, answers from the JSON files in
-/// assets/data/ after a short wait, like a real connection would.
+/// When [baseUrl] is set, requests go to the SCMS backend (Laravel) at
+/// [baseUrl]/api/mobile. Addresses the backend does not have yet
+/// ([_localOnly]), or everything when [baseUrl] is empty, answer from the
+/// JSON files in assets/data/ after a short wait, like a real connection
+/// would.
 ///
 /// Set the backend address when running the app:
 ///   flutter run --dart-define=API_BASE_URL=http://10.0.2.2:8000
@@ -41,8 +49,20 @@ class ApiClient {
   /// The backend address, e.g. "http://10.0.2.2:8000". Empty = offline.
   final String baseUrl;
 
-  /// Addresses the backend already answers. Add more as the backend grows.
-  static const Set<String> _remotePaths = {'/announcements'};
+  /// Sign-in token from /auth/verify, sent with every request.
+  String? token;
+
+  /// True when the app talks to the real backend.
+  bool get isConnected => baseUrl.isNotEmpty;
+
+  /// Addresses the backend does not have yet: always answered on the phone.
+  static const Set<String> _localOnly = {
+    '/notifications',
+    '/benefits',
+    '/places',
+    '/wallet',
+    '/violations',
+  };
 
   /// Address -> seed file in assets/data/.
   static const Map<String, String> _seedFiles = {
@@ -53,9 +73,11 @@ class ApiClient {
     '/wallet': 'wallet.json',
   };
 
+  bool _isRemote(String path) => isConnected && !_localOnly.contains(path);
+
   Future<dynamic> get(String path) async {
-    if (baseUrl.isNotEmpty && _remotePaths.contains(path)) {
-      return _getRemote(path);
+    if (_isRemote(path)) {
+      return _send(http.Request('GET', _uri(path)));
     }
     await Future<void>.delayed(latency);
     final file = _seedFiles[path];
@@ -71,15 +93,54 @@ class ApiClient {
     }
   }
 
-  Future<dynamic> _getRemote(String path) async {
+  /// Sends [body]. Offline it returns {"ok": true, "reference": "SC-123456"}.
+  Future<Map<String, dynamic>> post(
+      String path,
+      Map<String, dynamic> body,
+      ) async {
+    if (_isRemote(path)) {
+      final request = http.Request('POST', _uri(path))
+        ..headers['Content-Type'] = 'application/json'
+        ..body = jsonEncode(body);
+      return _asMap(await _send(request));
+    }
+    await Future<void>.delayed(latency);
+    return {'ok': true, 'reference': newReference()};
+  }
+
+  /// Sends the file at [filePath] as "file", with [fields] as form fields.
+  Future<Map<String, dynamic>> postFile(
+      String path, {
+        required String filePath,
+        Map<String, String> fields = const {},
+      }) async {
+    if (_isRemote(path)) {
+      final request = http.MultipartRequest('POST', _uri(path))
+        ..fields.addAll(fields);
+      try {
+        request.files.add(await http.MultipartFile.fromPath('file', filePath));
+      } on FileSystemException {
+        throw const ApiException('The photo is missing. Please take it again.');
+      }
+      return _asMap(await _send(request));
+    }
+    return post(path, fields);
+  }
+
+  Uri _uri(String path) => Uri.parse('$baseUrl/api/mobile$path');
+
+  Future<dynamic> _send(http.BaseRequest request) async {
     const noConnection = ApiException(
       'Could not connect. Please check your internet and try again.',
     );
+    request.headers['Accept'] = 'application/json';
+    final token = this.token;
+    if (token != null) request.headers['Authorization'] = 'Bearer $token';
+
     final http.Response response;
     try {
-      response = await _client.get(
-        Uri.parse('$baseUrl/api/mobile$path'),
-        headers: const {'Accept': 'application/json'},
+      response = await http.Response.fromStream(
+        await _client.send(request).timeout(timeout),
       ).timeout(timeout);
     } on SocketException {
       throw noConnection;
@@ -88,24 +149,34 @@ class ApiClient {
     } on http.ClientException {
       throw noConnection;
     }
-    if (response.statusCode < 200 || response.statusCode >= 300) {
-      throw const ApiException('Could not load the information.');
-    }
+
+    dynamic data;
     try {
-      return jsonDecode(utf8.decode(response.bodyBytes));
+      final text = utf8.decode(response.bodyBytes);
+      data = text.isEmpty ? null : jsonDecode(text);
     } on FormatException {
-      throw const ApiException('Could not load the information.');
+      data = null;
     }
+
+    final status = response.statusCode;
+    if (status >= 200 && status < 300) return data;
+
+    // Laravel sends {"message": "...", "code": "..."} for errors the user
+    // can fix (wrong code, missing paper). Server crashes get a plain text.
+    final message = data is Map && status < 500 ? data['message'] : null;
+    throw ApiException(
+      message is String && message.isNotEmpty
+          ? message
+          : status == 401
+          ? 'Please sign in again.'
+          : 'Could not load the information.',
+      code: data is Map ? data['code'] as String? : null,
+      statusCode: status,
+    );
   }
 
-  /// Sends [body]. Returns {"ok": true, "reference": "SC-123456"}.
-  Future<Map<String, dynamic>> post(
-      String path,
-      Map<String, dynamic> body,
-      ) async {
-    await Future<void>.delayed(latency);
-    return {'ok': true, 'reference': newReference()};
-  }
+  static Map<String, dynamic> _asMap(dynamic data) =>
+      data is Map ? Map<String, dynamic>.from(data) : <String, dynamic>{};
 
   /// Reference number shown to the user, e.g. "SC-482913".
   static String newReference() {

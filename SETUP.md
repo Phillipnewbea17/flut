@@ -36,15 +36,31 @@ SOS, Call, Text, Email and Directions buttons open other apps.
 
 ## 4. Test logins
 - Mobile number: any 10-digit number starting with 9
-- Code: 9109
+- Code: 9109 without a backend. With the backend, the real code is in
+  the backend's `storage/logs/laravel.log` (or texted, if
+  `SMS_DRIVER=semaphore`).
 - MPIN: any 4 numbers that are not easy to guess (not 1234 or 1111)
 
 ## 5. Connect to the SCMS backend (Laravel)
-Announcements come from the SCMS admin panel
-(`ella-proj/scms-backend`, endpoint `GET /api/mobile/announcements`).
+With a backend address, the app uses the SCMS admin panel
+(`ella-proj/scms-backend`, routes `/api/mobile/*`) for:
+
+- sign-in with a code sent to the phone
+- your profile (name, birthday, address)
+- photos of your papers and sending the application. It shows up in
+  the admin panel's Document Verification, with source "App".
+- the application status. It changes when the OSCA office verifies or
+  rejects it. "Cancel my application" is hidden, because only the office
+  can change it.
+- announcements
+
+Notifications, benefits, places, the Senior ID wallet and violation
+reports still use the files in `assets/data/` (the backend has no
+routes for them yet).
 
 1. Start MySQL in XAMPP, then in the backend folder run:
 
+       php artisan migrate
        php artisan serve --host=0.0.0.0 --port=8000
 
 2. Run the app with the backend address:

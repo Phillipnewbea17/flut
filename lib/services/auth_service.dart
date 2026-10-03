@@ -1,3 +1,6 @@
+import '../storage/secure_vault.dart';
+import 'api_client.dart';
+
 /// Thrown when sending or checking a code fails. [message] is written in
 /// plain words so a screen can show it to the user as-is.
 class AuthException implements Exception {
@@ -36,5 +39,44 @@ class FakeAuthService implements AuthService {
   Future<bool> verifyOtp({required String phone, required String code}) async {
     await Future<void>.delayed(const Duration(milliseconds: 600));
     return code == demoCode;
+  }
+}
+
+/// Real sign-in through the SCMS backend: the code is texted to the phone
+/// (or written to the server log while testing). The token it returns is
+/// kept in [SecureVault] and sent with every request by [ApiClient].
+class ApiAuthService implements AuthService {
+  ApiAuthService({required ApiClient api, required SecureVault vault})
+      : _api = api,
+        _vault = vault;
+
+  final ApiClient _api;
+  final SecureVault _vault;
+
+  @override
+  Future<void> sendOtp(String phone) async {
+    try {
+      await _api.post('/auth/code', {'phone': phone});
+    } on ApiException catch (e) {
+      throw AuthException(e.message);
+    }
+  }
+
+  @override
+  Future<bool> verifyOtp({required String phone, required String code}) async {
+    final Map<String, dynamic> result;
+    try {
+      result = await _api.post('/auth/verify', {'phone': phone, 'code': code});
+    } on ApiException catch (e) {
+      if (e.code == 'wrong_code') return false;
+      throw AuthException(e.message);
+    }
+    final token = result['token'];
+    if (token is! String || token.isEmpty) {
+      throw const AuthException('Something went wrong. Please try again.');
+    }
+    await _vault.saveToken(token);
+    _api.token = token;
+    return true;
   }
 }

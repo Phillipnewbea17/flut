@@ -113,7 +113,7 @@ class ApplicationProgressView extends StatelessWidget {
               icon: Icons.upload_file_outlined,
               onPressed: () => context.push(Routes.upload),
             ),
-            if (status.stage == ApplicationStage.submitted) ...[
+            if (applications.canCancel) ...[
               const SizedBox(height: 12),
               Center(
                 child: TextButton.icon(

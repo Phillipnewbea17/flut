@@ -36,9 +36,19 @@ Future<void> main() async {
   final db = await LocalDb.open();
   final documentVault = await DocumentVault.open();
 
-  // Services (fake server for now: see services/api_client.dart)
+  // Services. Without --dart-define=API_BASE_URL=... the app uses the fake
+  // server (see services/api_client.dart) and the demo code 9109.
   final api = ApiClient();
-  final AuthService auth = FakeAuthService();
+  final AuthService auth = api.isConnected
+      ? ApiAuthService(api: api, vault: vault)
+      : FakeAuthService();
+  if (api.isConnected) {
+    try {
+      api.token = await vault.readToken();
+    } catch (_) {
+      // Secure storage unreadable: the user signs in again.
+    }
+  }
 
   // Repositories
   final applications = ApplicationRepository(api: api, db: db);
@@ -59,6 +69,14 @@ Future<void> main() async {
 
   // Log out wipes everything that belongs to the account.
   session.addLogoutHook(() async {
+    if (api.isConnected && api.token != null) {
+      try {
+        await api.post('/auth/sign-out', const {});
+      } catch (_) {
+        // Offline: the token is still forgotten on this phone below.
+      }
+    }
+    api.token = null;
     user.reset();
     applications.reset();
     documents.reset();

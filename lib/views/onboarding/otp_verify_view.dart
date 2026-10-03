@@ -24,7 +24,7 @@ class OtpVerifyView extends StatefulWidget {
 
 class _OtpVerifyViewState extends State<OtpVerifyView> {
   static const int _codeLength = 4;
-  static const int _resendSeconds = 30;
+  static const int _resendSeconds = 60; // the server allows one code a minute
 
   final TextEditingController _codeController = TextEditingController();
   final FocusNode _focusNode = FocusNode();

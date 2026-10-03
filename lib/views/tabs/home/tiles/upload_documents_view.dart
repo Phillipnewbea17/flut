@@ -7,11 +7,14 @@ import 'package:go_router/go_router.dart';
 import 'package:image_picker/image_picker.dart';
 import 'package:provider/provider.dart';
 
+import '../../../../app_state/user_provider.dart';
 import '../../../../models/application_status.dart';
 import '../../../../models/document_item.dart';
 import '../../../../repositories/application_repository.dart';
 import '../../../../repositories/document_repository.dart';
+import '../../../../repositories/user_repository.dart';
 import '../../../../routes/app_router.dart';
+import '../../../../services/api_client.dart';
 import '../../../../theme/app_colors.dart';
 import '../../../../theme/app_theme.dart';
 import '../../../../utils/image_compressor.dart';
@@ -81,8 +84,12 @@ class _UploadDocumentsViewState extends State<UploadDocumentsView> {
   Future<void> _submit() async {
     final documents = context.read<DocumentRepository>();
     final applications = context.read<ApplicationRepository>();
+    final profile = context.read<UserProvider>().profile;
+    final users = context.read<UserRepository>();
     setState(() => _submitting = true);
     try {
+      // The OSCA office needs the name and birthday with the application.
+      if (profile != null) await users.syncProfile(profile);
       final reference = await documents.submitApplication();
       await applications.markSubmitted(reference);
       if (!mounted) return;
@@ -109,6 +116,8 @@ class _UploadDocumentsViewState extends State<UploadDocumentsView> {
       );
       if (!mounted) return;
       if (context.canPop()) context.pop();
+    } on ApiException catch (e) {
+      if (mounted) _say(e.message);
     } catch (_) {
       if (mounted) _say('The application was not sent. Please try again.');
     } finally {

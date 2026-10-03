@@ -73,6 +73,74 @@ void main() {
     expect(api.get('/announcements'), throwsA(isA<ApiException>()));
   });
 
+  test('posts JSON with the sign-in token', () async {
+    late http.Request sent;
+    final api = ApiClient(
+      bundle: bundle,
+      baseUrl: 'http://backend:8000',
+      client: MockClient((request) async {
+        sent = request;
+        return http.Response('{"ok":true,"reference":"APP-2026-0001"}', 201);
+      }),
+    )..token = 'abc';
+
+    final result = await api.post('/application/submit', {
+      'documents': ['a'],
+    });
+
+    expect(sent.url.path, '/api/mobile/application/submit');
+    expect(sent.headers['Authorization'], 'Bearer abc');
+    expect(jsonDecode(sent.body), {
+      'documents': ['a'],
+    });
+    expect(result['reference'], 'APP-2026-0001');
+  });
+
+  test("the server's message and code reach the app", () async {
+    final api = ApiClient(
+      bundle: bundle,
+      baseUrl: 'http://backend:8000',
+      client: MockClient((_) async => http.Response(
+            '{"message":"Wrong code. Please check and try again.","code":"wrong_code"}',
+            422,
+          )),
+    );
+
+    expect(
+      api.post('/auth/verify', {}),
+      throwsA(isA<ApiException>()
+          .having((e) => e.message, 'message', startsWith('Wrong code'))
+          .having((e) => e.code, 'code', 'wrong_code')
+          .having((e) => e.statusCode, 'statusCode', 422)),
+    );
+  });
+
+  test('addresses the backend does not have stay on the phone', () async {
+    final api = ApiClient(
+      bundle: bundle,
+      baseUrl: 'http://backend:8000',
+      latency: Duration.zero,
+      client: MockClient((_) async => fail('should not call the backend')),
+    );
+
+    final result = await api.post('/violations', {'store': 'X'});
+
+    expect(result['ok'], true);
+  });
+
+  test('a missing photo file becomes an ApiException', () async {
+    final api = ApiClient(
+      bundle: bundle,
+      baseUrl: 'http://backend:8000',
+      client: MockClient((_) async => fail('should not call the backend')),
+    );
+
+    expect(
+      api.postFile('/documents', filePath: 'does/not/exist.jpg'),
+      throwsA(isA<ApiException>()),
+    );
+  });
+
   test('no connection becomes an ApiException', () async {
     final api = ApiClient(
       bundle: bundle,

@@ -8,11 +8,12 @@ class DocumentService {
   final ApiClient _api;
 
   Future<void> upload(DocumentItem item) async {
-    final result = await _api.post('/documents', {
-      'id': item.id,
-      'type': item.type.name,
-      'sizeBytes': item.sizeBytes,
-    });
+    // Sending the same clientId again replaces the earlier photo.
+    final result = await _api.postFile(
+      '/documents',
+      filePath: item.filePath,
+      fields: {'type': item.type.name, 'clientId': item.id},
+    );
     if (result['ok'] != true) {
       throw const ApiException('The photo was not sent. Please try again.');
     }
