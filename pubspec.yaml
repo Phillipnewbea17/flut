@@ -1,0 +1,66 @@
+name: my_senior_app
+description: SeniorCompanion - pension and senior citizen services app.
+publish_to: "none"
+version: 1.0.0+1
+
+environment:
+  sdk: ">=3.5.0 <4.0.0"
+
+dependencies:
+  flutter:
+    sdk: flutter
+  cupertino_icons: ^1.0.8
+
+  # Talking to the SCMS backend (Laravel)
+  http: ^1.2.2
+
+  # Dates and money formatting
+  intl: ">=0.19.0 <0.21.0"
+
+  # State management + routing
+  provider: ^6.1.2
+  go_router: ^14.6.2
+
+  # Storage on the phone
+  shared_preferences: ^2.3.3
+  flutter_secure_storage: ^9.2.2
+  path_provider: ^2.1.4
+
+  # SVG illustrations (welcome slides). 2.0.17+ is needed for errorBuilder.
+  flutter_svg: ^2.0.17
+
+  # "Choose from phone contacts" (no READ_CONTACTS permission needed)
+  flutter_native_contact_picker: ">=0.0.8 <0.1.0"
+
+  # Camera / gallery for document photos
+  image_picker: ^1.1.2
+
+  # SOS call, text message, maps directions
+  url_launcher: ^6.3.1
+
+  # QR code shown to the cashier
+  qr_flutter: ^4.1.0
+
+  # Local Guide map (OpenStreetMap, no API key needed)
+  flutter_map: ">=7.0.2 <9.0.0"
+  latlong2: ">=0.9.1 <0.11.0"
+
+dev_dependencies:
+  flutter_test:
+    sdk: flutter
+  flutter_lints: ^5.0.0
+
+flutter:
+  uses-material-design: true
+
+  assets:
+    - assets/illustrations/ # your SVG illustrations
+    - assets/data/          # offline seed data (works with no backend)
+    - lib/l10n/             # translations: English, Filipino, Cebuano
+
+  fonts:
+    - family: AtkinsonHyperlegible
+      fonts:
+        - asset: assets/fonts/AtkinsonHyperlegible-Regular.ttf
+        - asset: assets/fonts/AtkinsonHyperlegible-Bold.ttf
+          weight: 700

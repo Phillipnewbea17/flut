@@ -1,0 +1,18 @@
+{
+  "applicationNo": "SC-2026-001284",
+  "stage": "review",
+  "message": "We are checking your documents. You will get a notification when it is done.",
+  "updatedAt": "2026-09-30T09:15:00",
+  "history": [
+    {
+      "stage": "submitted",
+      "date": "2026-09-29T14:02:00",
+      "note": "Application sent from the app."
+    },
+    {
+      "stage": "review",
+      "date": "2026-09-30T09:15:00",
+      "note": "The OSCA office started checking your papers."
+    }
+  ]
+}

@@ -1,0 +1,5 @@
+package com.seniorcompanion.my_senior_app
+
+import io.flutter.embedding.android.FlutterActivity
+
+class MainActivity : FlutterActivity()

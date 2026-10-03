@@ -1,0 +1,76 @@
+[
+  {
+    "id": "b-discount",
+    "title": "20% discount and no VAT",
+    "category": "discount",
+    "summary": "On medicines, restaurants, hotels, movies and public transport.",
+    "details": "Senior citizens get a 20% discount and do not pay the 12% VAT on many goods and services for their own use, under the Expanded Senior Citizens Act (RA 9994).",
+    "howToGet": [
+      "Show your Senior Citizen ID to the cashier.",
+      "For medicines, also bring your purchase booklet and prescription."
+    ]
+  },
+  {
+    "id": "b-groceries",
+    "title": "5% off basic groceries",
+    "category": "discount",
+    "summary": "On rice, bread, canned goods, coffee and other basic needs.",
+    "details": "Senior citizens get a 5% discount on basic necessities and prime commodities. Weekly limits apply. Ask the store or the OSCA office for the current limit.",
+    "howToGet": [
+      "Show your Senior Citizen ID and purchase booklet at the cashier."
+    ]
+  },
+  {
+    "id": "b-philhealth",
+    "title": "PhilHealth coverage",
+    "category": "health",
+    "summary": "All senior citizens are covered by PhilHealth.",
+    "details": "Every senior citizen is automatically covered by the national health insurance program (RA 10645).",
+    "howToGet": [
+      "Bring your Senior Citizen ID when you go to a hospital or clinic.",
+      "Ask the PhilHealth desk to check your membership."
+    ]
+  },
+  {
+    "id": "b-vaccines",
+    "title": "Free flu and pneumonia shots",
+    "category": "health",
+    "summary": "Free vaccines at your Rural Health Unit.",
+    "details": "The Department of Health gives free flu and pneumonia vaccines to senior citizens through local health units, while supplies last.",
+    "howToGet": [
+      "Visit your Rural Health Unit and bring your Senior Citizen ID."
+    ]
+  },
+  {
+    "id": "b-social-pension",
+    "title": "Social pension",
+    "category": "pension",
+    "summary": "Monthly pension for seniors who need support.",
+    "details": "Indigent senior citizens can get a monthly social pension from the national government (RA 11916). The OSCA office and DSWD decide who can get it.",
+    "howToGet": [
+      "Ask the OSCA office if you can be listed.",
+      "Bring your Senior Citizen ID and a barangay certificate."
+    ]
+  },
+  {
+    "id": "b-centenarian",
+    "title": "Cash gift at 80 and above",
+    "category": "assistance",
+    "summary": "Cash gifts at ages 80, 85, 90, 95 and 100.",
+    "details": "Under the Expanded Centenarians Act (RA 11982), seniors get a cash gift when they turn 80, 85, 90 and 95, and a bigger gift at 100.",
+    "howToGet": [
+      "Ask the OSCA office or DSWD a few months before the birthday.",
+      "Bring a birth certificate or another proof of age."
+    ]
+  },
+  {
+    "id": "b-priority",
+    "title": "Priority lanes",
+    "category": "assistance",
+    "summary": "Express lanes in government offices, banks and stores.",
+    "details": "Senior citizens should be served first through express or priority lanes.",
+    "howToGet": [
+      "Look for the priority lane sign and show your Senior Citizen ID."
+    ]
+  }
+]

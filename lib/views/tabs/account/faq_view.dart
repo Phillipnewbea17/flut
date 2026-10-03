@@ -1,0 +1,105 @@
+import 'package:flutter/material.dart';
+
+import '../../../theme/app_colors.dart';
+import '../../../theme/app_theme.dart';
+
+class FaqView extends StatelessWidget {
+  const FaqView({super.key});
+
+  static const List<(String, String)> _faqs = [
+    (
+      'Who can get a Senior Citizen ID?',
+      'Filipino citizens who are 60 years old or above and live in the town '
+          'where they apply.',
+    ),
+    (
+      'What papers do I need?',
+      'A birth certificate or any valid ID with your birthday, a barangay '
+          'certificate, and a 1x1 photo. You can send photos of them in '
+          'Upload documents.',
+    ),
+    (
+      'How long does it take?',
+      'It depends on your OSCA office. You will get a notification in this '
+          'app when your application is checked and when your ID is ready.',
+    ),
+    (
+      'What is the MPIN?',
+      'The 4 numbers you type to open this app. It keeps your information '
+          'safe if someone else uses your phone. Do not share it with anyone.',
+    ),
+    (
+      'I forgot my MPIN. What do I do?',
+      'On the MPIN screen, tap "Forgot MPIN?". You will log in again with '
+          'your phone number and make a new MPIN.',
+    ),
+    (
+      'Can my family help me?',
+      'Yes. A family member can install the app, choose "I am a Family '
+          'Relative", and send papers for you using Family mode.',
+    ),
+    (
+      'What does the SOS button do?',
+      'It lets you call or text your emergency contact, or call 911, with '
+          'big buttons. You can change your emergency contact in Account.',
+    ),
+    (
+      'The store did not give my discount. What can I do?',
+      'Go to Benefits & services and tap "Report a store". The OSCA office '
+          'can follow it up.',
+    ),
+    (
+      'Can I make the letters bigger?',
+      'Yes. Go to Account, then Text size and language.',
+    ),
+  ];
+
+  @override
+  Widget build(BuildContext context) {
+    return Scaffold(
+      appBar: AppTheme.appBar('Questions and answers'),
+      body: ListView.separated(
+        padding: const EdgeInsets.fromLTRB(20, 20, 20, 40),
+        itemCount: _faqs.length,
+        separatorBuilder: (context, index) => const SizedBox(height: 12),
+        itemBuilder: (context, index) {
+          final question = _faqs[index].$1;
+          final answer = _faqs[index].$2;
+          return Material(
+            color: Colors.white,
+            clipBehavior: Clip.antiAlias,
+            shape: RoundedRectangleBorder(
+              borderRadius: BorderRadius.circular(20),
+              side: const BorderSide(color: AppColors.primaryLight, width: 2),
+            ),
+            child: ExpansionTile(
+              tilePadding: const EdgeInsets.symmetric(horizontal: 18, vertical: 8),
+              childrenPadding: const EdgeInsets.fromLTRB(18, 0, 18, 18),
+              shape: const Border(),
+              collapsedShape: const Border(),
+              expandedAlignment: Alignment.centerLeft,
+              title: Text(
+                question,
+                style: const TextStyle(
+                  fontSize: 19,
+                  fontWeight: FontWeight.w700,
+                  color: AppColors.textPrimary,
+                ),
+              ),
+              children: [
+                Text(
+                  answer,
+                  style: const TextStyle(
+                    fontSize: 18,
+                    color: AppColors.textPrimary,
+                    height: 1.45,
+                  ),
+                ),
+              ],
+            ),
+          );
+        },
+      ),
+    );
+  }
+}

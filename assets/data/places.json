@@ -1,0 +1,57 @@
+[
+  {
+    "id": "p-rhu",
+    "name": "Ubay Rural Health Unit",
+    "category": "health",
+    "address": "Poblacion, Ubay, Bohol",
+    "latitude": 10.0569,
+    "longitude": 124.4731,
+    "phone": "",
+    "hours": "Monday to Friday, 8:00 AM to 5:00 PM",
+    "note": "Free flu shots for seniors. Bring your senior ID."
+  },
+  {
+    "id": "p-osca",
+    "name": "OSCA Office",
+    "category": "government",
+    "address": "Municipal Hall, Poblacion, Ubay, Bohol",
+    "latitude": 10.0561,
+    "longitude": 124.4722,
+    "phone": "",
+    "hours": "Monday to Friday, 8:00 AM to 5:00 PM",
+    "note": "Apply for, or replace, your Senior Citizen ID and purchase booklet."
+  },
+  {
+    "id": "p-mswdo",
+    "name": "Municipal Social Welfare Office",
+    "category": "government",
+    "address": "Municipal Hall, Poblacion, Ubay, Bohol",
+    "latitude": 10.0558,
+    "longitude": 124.4726,
+    "phone": "",
+    "hours": "Monday to Friday, 8:00 AM to 5:00 PM",
+    "note": "Ask about social pension and other help."
+  },
+  {
+    "id": "p-pharmacy-market",
+    "name": "Pharmacy near the public market",
+    "category": "pharmacy",
+    "address": "Near Ubay Public Market, Poblacion, Ubay, Bohol",
+    "latitude": 10.0577,
+    "longitude": 124.4741,
+    "phone": "",
+    "hours": "Every day, 7:00 AM to 8:00 PM",
+    "note": "20% senior discount on medicines. Bring your ID and booklet."
+  },
+  {
+    "id": "p-market",
+    "name": "Ubay Public Market",
+    "category": "discount",
+    "address": "Poblacion, Ubay, Bohol",
+    "latitude": 10.0581,
+    "longitude": 124.4747,
+    "phone": "",
+    "hours": "Every day, 5:00 AM to 6:00 PM",
+    "note": "Ask stores for the 5% senior discount on basic groceries."
+  }
+]
