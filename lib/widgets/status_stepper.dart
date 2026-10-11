@@ -4,64 +4,66 @@ import '../app_state/accessibility_provider.dart';
 import '../models/application_status.dart';
 import '../theme/app_colors.dart';
 
-/// Submitted -> Review -> Approved.
+enum _StepState { upcoming, done, current, warning, failed }
+
+/// Submitted -> Under review -> Approved, with an extra "Action needed" step
+/// only while the OSCA office is waiting for corrected papers.
 ///
-/// What each status looks like:
-///   Not started   ( )----( )----( )   nothing sent yet
-///   Submitted     (✓)----( )----( )   papers sent, waiting for the OSCA office
-///   Under review  (✓)====(•)----( )   the OSCA office is checking
-///   Action needed (✓)====(!)----( )   the OSCA office needs something from you
-///   Approved      (✓)====(✓)====(✓)   done
+///   Not started   ( )----( )----( )
+///   Submitted     (✓)----( )----( )         papers sent, waiting
+///   Under review  (✓)====(•)----( )         the OSCA office is checking
+///   Action needed (✓)====(✓)====(!)----( )  the office needs new papers
+///   Approved      (✓)====(✓)====(✓)
+///   Not approved  (✓)====(✓)====(✗)
 class StatusStepper extends StatelessWidget {
   final ApplicationStage stage;
 
   const StatusStepper({super.key, required this.stage});
 
-  /// A finished step (green circle with a check mark).
-  bool _isDone(int index) {
+  List<(String, _StepState)> _steps(BuildContext context) {
+    final submitted = context.tr('stepSubmitted');
+    final review = context.tr('stepReview');
+    final approved = context.tr('stepApproved');
+    const up = _StepState.upcoming;
+    const done = _StepState.done;
     switch (stage) {
       case ApplicationStage.notStarted:
-        return false;
+      case ApplicationStage.cancelled:
+        return [(submitted, up), (review, up), (approved, up)];
       case ApplicationStage.submitted:
+        return [(submitted, done), (review, up), (approved, up)];
       case ApplicationStage.review:
+        return [(submitted, done), (review, _StepState.current), (approved, up)];
       case ApplicationStage.needsAction:
-        return index == 0;
+        return [
+          (submitted, done),
+          (review, done),
+          (context.tr('stepNeedsAction'), _StepState.warning),
+          (approved, up),
+        ];
       case ApplicationStage.approved:
-        return true;
-    }
-  }
-
-  /// The step the OSCA office is working on right now (ring with a dot).
-  bool _isCurrent(int index) {
-    switch (stage) {
-      case ApplicationStage.review:
-      case ApplicationStage.needsAction:
-        return index == 1;
-      case ApplicationStage.notStarted:
-      case ApplicationStage.submitted:
-      case ApplicationStage.approved:
-        return false;
+        return [(submitted, done), (review, done), (approved, done)];
+      case ApplicationStage.rejected:
+        return [
+          (submitted, done),
+          (review, done),
+          (context.tr('stepNotApproved'), _StepState.failed),
+        ];
     }
   }
 
   @override
   Widget build(BuildContext context) {
-    final labels = [
-      context.tr('stepSubmitted'),
-      context.tr('stepReview'),
-      context.tr('stepApproved'),
-    ];
+    final steps = _steps(context);
+    bool reached(int i) => steps[i].$2 != _StepState.upcoming;
 
     return Semantics(
       label: 'Application progress: ${context.tr(stage.labelKey)}',
       child: ExcludeSemantics(
         child: Row(
           crossAxisAlignment: CrossAxisAlignment.start,
-          children: List.generate(labels.length, (i) {
-            final done = _isDone(i);
-            final current = _isCurrent(i);
-            final highlighted = done || current;
-
+          children: List.generate(steps.length, (i) {
+            final (label, state) = steps[i];
             return Expanded(
               child: Column(
                 children: [
@@ -71,21 +73,14 @@ class StatusStepper extends StatelessWidget {
                       Expanded(
                         child: i == 0
                             ? const SizedBox.shrink()
-                            : _Line(active: highlighted),
+                            : _Line(active: reached(i)),
                       ),
-                      _Node(
-                        done: done,
-                        current: current,
-                        warning: current &&
-                            stage == ApplicationStage.needsAction,
-                      ),
+                      _Node(state: state),
                       // Line going out to the next step.
                       Expanded(
-                        child: i == labels.length - 1
+                        child: i == steps.length - 1
                             ? const SizedBox.shrink()
-                            : _Line(
-                          active: _isDone(i + 1) || _isCurrent(i + 1),
-                        ),
+                            : _Line(active: reached(i + 1)),
                       ),
                     ],
                   ),
@@ -95,15 +90,15 @@ class StatusStepper extends StatelessWidget {
                   FittedBox(
                     fit: BoxFit.scaleDown,
                     child: Text(
-                      labels[i],
+                      label,
                       maxLines: 1,
                       softWrap: false,
                       textAlign: TextAlign.center,
                       style: TextStyle(
                         fontSize: 17,
                         fontWeight:
-                        highlighted ? FontWeight.w700 : FontWeight.w400,
-                        color: highlighted
+                            reached(i) ? FontWeight.w700 : FontWeight.w400,
+                        color: reached(i)
                             ? AppColors.textPrimary
                             : AppColors.textSecondary,
                       ),
@@ -134,71 +129,67 @@ class _Line extends StatelessWidget {
 }
 
 class _Node extends StatelessWidget {
-  final bool done;
-  final bool current;
-  final bool warning;
+  final _StepState state;
 
-  const _Node({
-    required this.done,
-    required this.current,
-    required this.warning,
-  });
+  const _Node({required this.state});
 
   static const double _size = 44;
 
   @override
   Widget build(BuildContext context) {
-    // Finished: green circle with a check mark.
-    if (done) {
-      return Container(
-        width: _size,
-        height: _size,
-        decoration: const BoxDecoration(
-          color: AppColors.primary,
-          shape: BoxShape.circle,
-        ),
-        child: const Icon(Icons.check, color: Colors.white, size: 26),
-      );
-    }
-
-    // In progress: white circle with a ring and a dot (or "!" if action
-    // is needed).
-    if (current) {
-      final color = warning ? AppColors.warning : AppColors.primary;
-      return Container(
-        width: _size,
-        height: _size,
-        alignment: Alignment.center,
-        decoration: BoxDecoration(
-          color: Colors.white,
-          shape: BoxShape.circle,
-          border: Border.all(color: color, width: 4),
-          boxShadow: const [
-            BoxShadow(color: AppColors.primaryLight, spreadRadius: 4),
-          ],
-        ),
-        child: warning
-            ? Icon(Icons.priority_high, color: color, size: 24)
-            : Container(
-          width: 16,
-          height: 16,
+    switch (state) {
+      // Finished: green circle with a check mark.
+      case _StepState.done:
+        return _filled(AppColors.primary, Icons.check);
+      // Not approved: red circle with a cross.
+      case _StepState.failed:
+        return _filled(AppColors.danger, Icons.close);
+      // In progress: white circle with a ring and a dot, or "!" when the
+      // office needs something from the user.
+      case _StepState.current:
+      case _StepState.warning:
+        final warning = state == _StepState.warning;
+        final color = warning ? AppColors.warning : AppColors.primary;
+        return Container(
+          width: _size,
+          height: _size,
+          alignment: Alignment.center,
           decoration: BoxDecoration(
-            color: color,
+            color: Colors.white,
             shape: BoxShape.circle,
+            border: Border.all(color: color, width: 4),
+            boxShadow: const [
+              BoxShadow(color: AppColors.primaryLight, spreadRadius: 4),
+            ],
           ),
-        ),
-      );
+          child: warning
+              ? Icon(Icons.priority_high, color: color, size: 24)
+              : Container(
+                  width: 16,
+                  height: 16,
+                  decoration: BoxDecoration(color: color, shape: BoxShape.circle),
+                ),
+        );
+      // Not reached yet: empty grey circle.
+      case _StepState.upcoming:
+        return Container(
+          width: _size,
+          height: _size,
+          decoration: BoxDecoration(
+            color: Colors.white,
+            shape: BoxShape.circle,
+            border: Border.all(color: AppColors.primaryMuted, width: 3),
+          ),
+        );
     }
+  }
 
-    // Not reached yet: empty grey circle.
+  Widget _filled(Color color, IconData icon) {
     return Container(
       width: _size,
       height: _size,
-      decoration: BoxDecoration(
-        color: Colors.white,
-        shape: BoxShape.circle,
-        border: Border.all(color: AppColors.primaryMuted, width: 3),
-      ),
+      decoration: BoxDecoration(color: color, shape: BoxShape.circle),
+      child: Icon(icon, color: Colors.white, size: 26),
     );
   }
 }

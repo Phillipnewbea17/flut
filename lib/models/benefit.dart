@@ -14,11 +14,14 @@ extension BenefitCategoryInfo on BenefitCategory {
     }
   }
 
-  static BenefitCategory parse(String? name) {
-    return BenefitCategory.values.firstWhere(
-      (c) => c.name == name,
-      orElse: () => BenefitCategory.assistance,
-    );
+  static BenefitCategory parse(String? name) =>
+      tryParse(name) ?? BenefitCategory.assistance;
+
+  static BenefitCategory? tryParse(String? name) {
+    for (final c in BenefitCategory.values) {
+      if (c.name == name) return c;
+    }
+    return null;
   }
 }
 

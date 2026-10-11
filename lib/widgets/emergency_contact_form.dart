@@ -17,6 +17,9 @@ class EmergencyContactForm extends StatefulWidget {
   /// The user's own number (10 digits). The SOS contact cannot be the same.
   final String? ownPhone;
 
+  /// Numbers of the other emergency contacts, so no one is added twice.
+  final Set<String> takenPhones;
+
   final String submitLabel;
   final IconData submitIcon;
   final Future<void> Function(EmergencyContact contact) onSubmit;
@@ -28,6 +31,7 @@ class EmergencyContactForm extends StatefulWidget {
     this.submitIcon = Icons.save_outlined,
     this.initial,
     this.ownPhone,
+    this.takenPhones = const {},
   });
 
   @override
@@ -37,6 +41,7 @@ class EmergencyContactForm extends StatefulWidget {
 class _EmergencyContactFormState extends State<EmergencyContactForm> {
   final TextEditingController _nameController = TextEditingController();
   final TextEditingController _phoneController = TextEditingController();
+  final TextEditingController _relationshipController = TextEditingController();
   final FlutterNativeContactPicker _picker = FlutterNativeContactPicker();
 
   String? _nameError;
@@ -50,6 +55,7 @@ class _EmergencyContactFormState extends State<EmergencyContactForm> {
     if (initial != null) {
       _nameController.text = initial.name;
       _phoneController.text = PhoneNumberFormatter.format(initial.phone);
+      _relationshipController.text = initial.relationship;
     }
   }
 
@@ -57,6 +63,7 @@ class _EmergencyContactFormState extends State<EmergencyContactForm> {
   void dispose() {
     _nameController.dispose();
     _phoneController.dispose();
+    _relationshipController.dispose();
     super.dispose();
   }
 
@@ -114,6 +121,8 @@ class _EmergencyContactFormState extends State<EmergencyContactForm> {
       phoneError = 'Please enter a 10-digit mobile number that starts with 9.';
     } else if (phone == widget.ownPhone) {
       phoneError = 'Please choose someone other than yourself.';
+    } else if (widget.takenPhones.contains(phone)) {
+      phoneError = 'This person is already on your list.';
     }
 
     setState(() {
@@ -125,7 +134,11 @@ class _EmergencyContactFormState extends State<EmergencyContactForm> {
     FocusScope.of(context).unfocus();
     setState(() => _busy = true);
     try {
-      await widget.onSubmit(EmergencyContact(name: name, phone: phone));
+      await widget.onSubmit(EmergencyContact(
+        name: name,
+        phone: phone,
+        relationship: _relationshipController.text.trim(),
+      ));
     } catch (_) {
       if (mounted) {
         setState(() {
@@ -166,6 +179,18 @@ class _EmergencyContactFormState extends State<EmergencyContactForm> {
             errorMaxLines: 2,
             errorStyle: OnboardingScaffold.errorText,
           ),
+        ),
+        const SizedBox(height: 24),
+        const Text('Relationship (optional)',
+            style: OnboardingScaffold.fieldLabel),
+        const SizedBox(height: 10),
+        TextField(
+          controller: _relationshipController,
+          enabled: !_busy,
+          textCapitalization: TextCapitalization.words,
+          textInputAction: TextInputAction.next,
+          style: const TextStyle(fontSize: 20, color: AppColors.textPrimary),
+          decoration: const InputDecoration(hintText: 'Daughter, Son, Neighbor'),
         ),
         const SizedBox(height: 24),
         const Text('Mobile number', style: OnboardingScaffold.fieldLabel),

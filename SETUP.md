@@ -34,29 +34,93 @@ SOS, Call, Text, Email and Directions buttons open other apps.
     <key>LSApplicationQueriesSchemes</key>
     <array><string>tel</string><string>sms</string><string>mailto</string></array>
 
-## 4. Test logins
-- Mobile number: any 10-digit number starting with 9
-- Code: 9109 without a backend. With the backend, the real code is in
-  the backend's `storage/logs/laravel.log` (or texted, if
-  `SMS_DRIVER=semaphore`).
-- MPIN: any 4 numbers that are not easy to guess (not 1234 or 1111)
+## 4. Signing in
+Signing in needs the SCMS backend (section 5). There is no demo code and
+no pretend login: without `API_BASE_URL`, Create Account and Login say
+"Signing in is not available right now".
+
+- Create Account: mobile number -> 4-digit code -> create + confirm a
+  4-digit MPIN -> match the senior citizen record -> Home
+- Login: mobile number -> 4-digit code -> 4-digit MPIN -> Home
+- Forgot MPIN: mobile number -> 4-digit code -> new MPIN -> Login
+
+While developing, the code is in the backend's `storage/logs/laravel.log`
+(`SMS_DRIVER=log`, refused when `APP_ENV=production`). In production set
+`SMS_DRIVER=semaphore` and `SEMAPHORE_API_KEY`. The MPIN must not be easy
+to guess (not 1234, 1111...) and not the same as the code.
+
+The MPIN is never saved on the phone. The backend stores it hashed
+(bcrypt), never logs it and never sends it back. Older builds saved it on
+the phone in plain text; the app deletes that copy on start.
+
+### Sign-in routes (`/api/mobile`, Mobile\AuthController)
+Errors are `{"message": "...", "code": "..."}`; the app shows its own
+wording for each `code`, never the server's text.
+
+| Route | Body | Answer |
+|---|---|---|
+| `POST /auth/code` | `phone`, `purpose`: `register`, `login` or `reset_mpin` | `{"expiresIn": 300, "resendIn": 60}` |
+| `POST /auth/verify` | `phone`, `code`, `purpose` | `{"verificationToken": "..."}`: 10 minutes, one use, only for that purpose. Not a session. |
+| `POST /auth/register` | `phone`, `verificationToken`, `mpin` | `{"token": "..."}`. Creates the account. |
+| `POST /auth/login` | `phone`, `verificationToken`, `mpin` | `{"token": "..."}` |
+| `POST /auth/mpin/reset` | `phone`, `verificationToken`, `mpin` | `{"ok": true}`. Signs out everywhere; does not sign in. |
+| `POST /auth/mpin/change` (signed in) | `currentMpin`, `mpin` | `{"ok": true}` |
+| `POST /auth/sign-out` (signed in) | | |
+
+Limits: codes are random, stored hashed, last 5 minutes, 5 wrong tries;
+one new code per minute and 5 per hour per number; 5 wrong MPINs lock the
+account for 15 minutes (Forgot MPIN unlocks it). Tokens from the old
+code-only sign-in are refused, so those users log in again.
+
+### Linking the senior citizen record
+After Create Account the senior gives their Senior Citizen / OSCA ID
+number, name and birthday (scanned, read from a photo of the ID, or
+typed) and takes a live selfie (`POST /identity/verify`). The backend
+checks that the ID number, name and birthday match an existing record.
+No record is ever created by the app.
+
+The records have no photo to compare a selfie with, and no face-matching
+service is configured, so the selfie is checked by OSCA staff: admin web
+app > **App Account Verification**. "Same person: link account" links the
+app account to the record; "Reject" (with a reason) lets the senior try
+again. Until then the app shows "Waiting for the OSCA office", and the
+services below answer `not_linked`.
 
 ## 5. Connect to the SCMS backend (Laravel)
-With a backend address, the app uses the SCMS admin panel
-(`ella-proj/scms-backend`, routes `/api/mobile/*`) for:
+Everything about the user comes from the SCMS backend
+(`ella-proj/scms-backend`, routes `/api/mobile/*`). Without a backend
+address the app sends nothing and pretends nothing.
 
-- sign-in with a code sent to the phone
-- your profile (name, birthday, address)
-- photos of your papers and sending the application. It shows up in
-  the admin panel's Document Verification, with source "App".
-- the application status. It changes when the OSCA office verifies or
-  rejects it. "Cancel my application" is hidden, because only the office
-  can change it.
-- announcements
+| App | Route | Web module |
+|---|---|---|
+| Profile | `GET/POST /profile` | Records (the linked record is the source of truth) |
+| Notifications | `GET /notifications` | built from the account's own records |
+| Announcements | `GET /announcements` | Announcements |
+| Senior Citizen application | `POST /documents`, `POST /application/submit`, `GET /application` | Document Verification (source "App") |
+| Medical assistance * | `GET/POST /medical-requests` | Medical (source "App") |
+| Burial assistance * | `GET/POST /burial-requests` | Burial (source "App") |
+| Help & complaints * | `GET/POST /help-requests` | Help & Complaint Desk (source "App") |
+| ID replacement * | `GET/POST /senior-id/replacement-requests` | OSCA IDs (replacement source "App") |
+| Photos with a request * | `POST {route}/{reference}/attachments` | staff: `GET /api/request-attachments` |
+| My ID * | `GET /wallet` | OSCA IDs |
+| My pension * | `GET /pension` | Pension |
 
-Notifications, benefits, places, the Senior ID wallet and violation
-reports still use the files in `assets/data/` (the backend has no
-routes for them yet).
+\* Only for an account linked to its senior record. The app only ever
+gets the account's own records, and only what is meant for the senior
+(status, dates and the office's answer; no staff notes or amounts).
+
+Only the benefits/discounts guide and the places list are read from
+`assets/data/` (reference content shipped with the app; the backend has
+no tables for them).
+
+`GET /application` may also send per-paper results, so the app can
+say which paper needs fixing (`DocumentReview` in
+`lib/models/document_item.dart`):
+
+    "documents": [{"type": "proofOfResidence", "status": "needsCorrection",
+                   "note": "The photo is blurred.", "reviewedAt": "..."}]
+
+Without it, the app shows the office's note for the whole application.
 
 1. Start MySQL in XAMPP, then in the backend folder run:
 
@@ -72,32 +136,16 @@ routes for them yet).
 
 Plain `flutter run` (no API_BASE_URL) uses only the files below.
 
-## 6. The app's data (offline seed files)
-`lib/services/api_client.dart` answers from the files in `assets/data/`
-for everything the backend does not serve yet.
-Edit them to change what the app shows:
+## 6. Guides shipped with the app
+Only these two files in `assets/data/` are read by the app:
 
-- `application.json`: application status ("notStarted", "submitted",
-  "review", "needsAction" or "approved")
-- `announcements.json`, `notifications.json`, `benefits.json`
+- `benefits.json`: the benefits and discounts guide
 - `places.json`: Local Guide places. The coordinates are approximate,
   so replace them with your verified list.
-- `wallet.json`: the digital Senior ID. It is `null` until approved. To
-  see the ID card and the cashier QR code, change it to:
 
-      {
-        "seniorId": {
-          "idNumber": "UBY-2026-00128",
-          "fullName": "Rosela Mabuhay",
-          "birthDate": "1958-03-14",
-          "address": "Poblacion, Ubay, Bohol",
-          "issuedBy": "OSCA Ubay",
-          "issuedAt": "2026-10-10"
-        }
-      }
-
-After editing a file in `assets/data/`, stop the app and run it again.
-Pull down on a screen to refresh.
+Everything else (application status, notifications, announcements, the
+Senior ID) comes from the backend. After editing a file, stop the app
+and run it again.
 
 ## 7. Before release
 - `views/tabs/account/contact_us_view.dart`: add the OSCA phone and email.
@@ -107,4 +155,4 @@ Pull down on a screen to refresh.
   official privacy notice.
 - `lib/l10n/app_fil.arb` and `app_ceb.arb`: have a native speaker
   check the translations.
-- `main.dart`: replace `FakeAuthService` with your real login service.
+- Use an `https://` `API_BASE_URL`: the MPIN and the code are sent to it.

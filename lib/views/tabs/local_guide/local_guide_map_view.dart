@@ -14,10 +14,23 @@ import '../../../widgets/big_button.dart';
 import '../../../widgets/info_card.dart';
 import 'place_detail_sheet.dart';
 
-/// Local Guide tab: map of clinics, pharmacies, offices and stores, with a
+/// Local Guide as its own page (opened from the Benefits tab).
+class LocalGuidePage extends StatelessWidget {
+  const LocalGuidePage({super.key});
+
+  @override
+  Widget build(BuildContext context) {
+    return const Scaffold(body: LocalGuideMapView(showBackButton: true));
+  }
+}
+
+/// Local Guide: map of clinics, pharmacies, offices and stores, with a
 /// list below it (the list works offline even when the map cannot load).
 class LocalGuideMapView extends StatefulWidget {
-  const LocalGuideMapView({super.key});
+  /// Shows a back arrow in the green header (when opened as a page).
+  final bool showBackButton;
+
+  const LocalGuideMapView({super.key, this.showBackButton = false});
 
   @override
   State<LocalGuideMapView> createState() => _LocalGuideMapViewState();
@@ -91,16 +104,33 @@ class _LocalGuideMapViewState extends State<LocalGuideMapView> {
             child: Column(
               crossAxisAlignment: CrossAxisAlignment.start,
               children: [
-                Semantics(
-                  header: true,
-                  child: Text(
-                    context.tr('guideTitle'),
-                    style: const TextStyle(
-                      color: Colors.white,
-                      fontSize: 30,
-                      fontWeight: FontWeight.w700,
+                Row(
+                  children: [
+                    if (widget.showBackButton)
+                      Padding(
+                        padding: const EdgeInsets.only(right: 4),
+                        child: IconButton(
+                          tooltip: 'Back',
+                          iconSize: 30,
+                          color: Colors.white,
+                          onPressed: () => Navigator.of(context).maybePop(),
+                          icon: const Icon(Icons.arrow_back),
+                        ),
+                      ),
+                    Expanded(
+                      child: Semantics(
+                        header: true,
+                        child: Text(
+                          context.tr('guideTitle'),
+                          style: const TextStyle(
+                            color: Colors.white,
+                            fontSize: 30,
+                            fontWeight: FontWeight.w700,
+                          ),
+                        ),
+                      ),
                     ),
-                  ),
+                  ],
                 ),
                 if (location.isNotEmpty)
                   Text(

@@ -49,7 +49,7 @@ void main() {
     expect((data as List).first['title'], 'From server');
   });
 
-  test('announcements come from the seed file when baseUrl is empty', () async {
+  test('without a backend address user data is never made up', () async {
     final api = ApiClient(
       bundle: bundle,
       baseUrl: '',
@@ -57,9 +57,22 @@ void main() {
       client: MockClient((_) async => fail('should not call the backend')),
     );
 
-    final data = await api.get('/announcements');
+    for (final path in ['/announcements', '/notifications', '/wallet', '/application']) {
+      await expectLater(api.get(path), throwsA(isA<ApiException>()), reason: path);
+    }
+    await expectLater(
+        api.post('/application/submit', {}), throwsA(isA<ApiException>()));
+  });
 
-    expect((data as List).first['title'], 'From seed');
+  test('the benefits guide ships with the app', () async {
+    final api = ApiClient(
+      bundle: _FakeBundle({'assets/data/benefits.json': '[{"id":"b1"}]'}),
+      baseUrl: 'http://backend:8000',
+      latency: Duration.zero,
+      client: MockClient((_) async => fail('should not call the backend')),
+    );
+
+    expect((await api.get('/benefits') as List).first['id'], 'b1');
   });
 
   test('a server error becomes an ApiException', () async {
@@ -115,17 +128,21 @@ void main() {
     );
   });
 
-  test('addresses the backend does not have stay on the phone', () async {
+  test('help requests go to the backend', () async {
+    late http.Request sent;
     final api = ApiClient(
       bundle: bundle,
       baseUrl: 'http://backend:8000',
-      latency: Duration.zero,
-      client: MockClient((_) async => fail('should not call the backend')),
+      client: MockClient((request) async {
+        sent = request;
+        return http.Response('{"ok":true,"reference":"HLP-2026-0001"}', 201);
+      }),
     );
 
-    final result = await api.post('/violations', {'store': 'X'});
+    final result = await api.post('/help-requests', {'description': 'X'});
 
-    expect(result['ok'], true);
+    expect(sent.url.path, '/api/mobile/help-requests');
+    expect(result['reference'], 'HLP-2026-0001');
   });
 
   test('a missing photo file becomes an ApiException', () async {

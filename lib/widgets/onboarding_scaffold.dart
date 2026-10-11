@@ -24,29 +24,29 @@ class OnboardingScaffold extends StatelessWidget {
 
   // Text styles shared by the cards on these screens.
   static const TextStyle cardTitle = TextStyle(
-    fontSize: 26,
+    fontSize: 22,
     fontWeight: FontWeight.w700,
     color: AppColors.textPrimary,
     height: 1.25,
   );
   static const TextStyle cardBody = TextStyle(
-    fontSize: 18,
+    fontSize: 15,
     color: AppColors.textSecondary,
     height: 1.45,
   );
   static const TextStyle fieldLabel = TextStyle(
-    fontSize: 18,
+    fontSize: 15,
     fontWeight: FontWeight.w700,
     color: AppColors.textPrimary,
   );
   static const TextStyle errorText = TextStyle(
-    fontSize: 16,
+    fontSize: 14,
     fontWeight: FontWeight.w600,
     color: AppColors.danger,
     height: 1.3,
   );
   static const TextStyle linkText = TextStyle(
-    fontSize: 18,
+    fontSize: 15,
     fontWeight: FontWeight.w700,
     color: AppColors.primary,
     decoration: TextDecoration.underline,
@@ -84,14 +84,14 @@ class OnboardingScaffold extends StatelessWidget {
                         ),
                         const SizedBox(width: 4),
                       ],
-                      const AppLogo(size: 56),
+                      const AppLogo(size: 48),
                       const SizedBox(width: 14),
                       const Flexible(
                         child: Text(
                           'SeniorCompanion',
                           style: TextStyle(
                             color: Colors.white,
-                            fontSize: 24,
+                            fontSize: 20,
                             fontWeight: FontWeight.w700,
                           ),
                         ),
@@ -105,7 +105,7 @@ class OnboardingScaffold extends StatelessWidget {
                       title,
                       style: const TextStyle(
                         color: Colors.white,
-                        fontSize: 32,
+                        fontSize: 28,
                         fontWeight: FontWeight.w700,
                         height: 1.15,
                       ),
@@ -114,7 +114,7 @@ class OnboardingScaffold extends StatelessWidget {
                   const SizedBox(height: 8),
                   Text(
                     subtitle,
-                    style: const TextStyle(color: Colors.white, fontSize: 20),
+                    style: const TextStyle(color: Colors.white, fontSize: 16),
                   ),
                   const SizedBox(height: 36),
                 ],
@@ -159,7 +159,7 @@ class GreenHeaderStack extends StatelessWidget {
           bottom: overlap,
           child: const DecoratedBox(
             decoration: BoxDecoration(
-              color: AppColors.primary,
+              gradient: AppColors.heroGradient,
               borderRadius: BorderRadius.vertical(bottom: Radius.circular(40)),
             ),
           ),

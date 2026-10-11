@@ -1,0 +1,582 @@
+﻿<!DOCTYPE html>
+<html>
+<head>
+<meta charset="utf-8">
+<title>SeniorCompanion – Design Directions</title>
+<style>
+  * { box-sizing: border-box; margin: 0; padding: 0; }
+  body { font-family: "Segoe UI", Roboto, "Helvetica Neue", Arial, sans-serif; background: #E9EFEB; color: #10211A; }
+  svg.i { width: 1em; height: 1em; fill: currentColor; flex: none; display: block; }
+
+  .board { display: none; width: 1264px; height: 940px; padding: 48px; gap: 40px; align-items: flex-start; }
+  .board.on { display: flex; }
+
+  /* ---------- side panel ---------- */
+  .side { width: 300px; height: 844px; display: flex; flex-direction: column; margin-right: 8px; }
+  .side .tag { font-size: 13px; font-weight: 700; letter-spacing: .14em; text-transform: uppercase; color: #3C6B52; }
+  .side h1 { font-size: 40px; line-height: 1.05; margin: 10px 0 14px; letter-spacing: -.02em; }
+  .side p { font-size: 16px; line-height: 1.55; color: #4A5E55; }
+  .side ul { margin: 18px 0 0 0; list-style: none; }
+  .side li { font-size: 15px; line-height: 1.45; color: #2A3D34; padding: 8px 0 8px 22px; position: relative; border-top: 1px solid #D3DED7; }
+  .side li:before { content: ""; position: absolute; left: 2px; top: 15px; width: 8px; height: 8px; border-radius: 50%; background: #0B7A43; }
+  .side .sw-title { margin-top: auto; font-size: 13px; font-weight: 700; letter-spacing: .1em; text-transform: uppercase; color: #3C6B52; margin-bottom: 10px; }
+  .swatches { display: flex; gap: 10px; }
+  .sw { flex: 1; }
+  .sw b { display: block; height: 56px; border-radius: 12px; border: 1px solid rgba(0,0,0,.08); }
+  .sw span { display: block; font-size: 11px; margin-top: 6px; color: #4A5E55; font-family: Consolas, monospace; }
+
+  /* ---------- phone frame ---------- */
+  .phone { width: 390px; height: 844px; border-radius: 44px; overflow: hidden; position: relative; box-shadow: 0 30px 60px -20px rgba(16,40,28,.35), 0 0 0 10px #10211A; flex: none; }
+  .screen { position: absolute; inset: 0; display: flex; flex-direction: column; }
+  .scroll { flex: 1; overflow: hidden; position: relative; }
+  .status-bar { height: 50px; display: flex; align-items: center; justify-content: space-between; padding: 6px 30px 0 34px; font-size: 16px; font-weight: 600; flex: none; }
+  .status-bar .dots { display: flex; gap: 6px; align-items: center; }
+  .status-bar .bat { width: 26px; height: 12px; border-radius: 3px; border: 1.6px solid currentColor; position: relative; }
+  .status-bar .bat:after { content: ""; position: absolute; inset: 1.5px; right: 5px; background: currentColor; border-radius: 1px; }
+  .status-bar .sig { display: flex; gap: 2px; align-items: flex-end; height: 12px; }
+  .status-bar .sig i { width: 3px; background: currentColor; border-radius: 1px; }
+
+  /* =========================================================
+     DESIGN 1 – FOREST HEADER
+     ========================================================= */
+  .d1 { background: #F3F7F4; }
+  .d1 .hdr { background: #0B5F35; color: #fff; padding: 0 22px 110px; border-radius: 0 0 32px 32px; position: relative; overflow: hidden; }
+  .d1 .hdr:after { content: ""; position: absolute; right: -60px; top: -40px; width: 220px; height: 220px; border-radius: 50%; background: rgba(255,255,255,.06); }
+  .d1 .hdr:before { content: ""; position: absolute; right: 40px; top: 90px; width: 140px; height: 140px; border-radius: 50%; background: rgba(255,255,255,.05); }
+  .d1 .loc { display: flex; align-items: center; gap: 8px; font-size: 16px; font-weight: 600; opacity: .95; }
+  .d1 .top { display: flex; justify-content: space-between; align-items: center; padding-top: 6px; position: relative; z-index: 1; }
+  .d1 .bell { width: 48px; height: 48px; border-radius: 50%; background: rgba(255,255,255,.14); display: grid; place-items: center; font-size: 26px; position: relative; }
+  .d1 .bell em { position: absolute; top: 6px; right: 6px; width: 18px; height: 18px; border-radius: 50%; background: #E5484D; border: 2px solid #0B5F35; font-size: 10px; font-style: normal; font-weight: 700; display: grid; place-items: center; }
+  .d1 .greet { margin-top: 22px; position: relative; z-index: 1; }
+  .d1 .greet h2 { font-size: 30px; font-weight: 700; letter-spacing: -.01em; }
+  .d1 .greet p { font-size: 17px; opacity: .85; margin-top: 4px; }
+  .d1 .card { background: #fff; border-radius: 22px; box-shadow: 0 10px 30px -12px rgba(11,95,53,.35); }
+  .d1 .status { margin: -92px 18px 0; padding: 20px; position: relative; z-index: 2; }
+  .d1 .status .row { display: flex; justify-content: space-between; align-items: center; }
+  .d1 .status h3 { font-size: 19px; }
+  .d1 .pill { display: inline-flex; align-items: center; gap: 6px; background: #E3F3E9; color: #0B6B3A; font-weight: 700; font-size: 14px; padding: 6px 12px; border-radius: 99px; }
+  .d1 .pill:before { content: ""; width: 8px; height: 8px; border-radius: 50%; background: #13A05A; }
+  .d1 .status .no { font-size: 14px; color: #5B6F65; margin-top: 4px; }
+  .d1 .steps { display: flex; gap: 6px; margin: 16px 0 8px; }
+  .d1 .steps i { flex: 1; height: 6px; border-radius: 3px; background: #DDE8E1; }
+  .d1 .steps i.on { background: #13A05A; }
+  .d1 .steps-l { display: flex; justify-content: space-between; font-size: 12px; color: #5B6F65; }
+  .d1 .btn { margin-top: 16px; height: 54px; border-radius: 14px; background: #0B5F35; color: #fff; font-size: 17px; font-weight: 700; display: flex; align-items: center; justify-content: center; gap: 8px; }
+  .d1 .sec { display: flex; justify-content: space-between; align-items: baseline; padding: 24px 20px 12px; }
+  .d1 .sec h3 { font-size: 21px; }
+  .d1 .sec a { font-size: 15px; font-weight: 700; color: #0B6B3A; }
+  .d1 .grid { display: grid; grid-template-columns: 1fr 1fr; gap: 12px; padding: 0 18px; }
+  .d1 .tile { padding: 16px; border-radius: 20px; background: #fff; border: 1px solid #E1EAE4; }
+  .d1 .tile .ic { width: 50px; height: 50px; border-radius: 14px; background: #E3F3E9; color: #0B6B3A; display: grid; place-items: center; font-size: 26px; }
+  .d1 .tile b { display: block; font-size: 17px; margin-top: 12px; }
+  .d1 .tile span { display: block; font-size: 13px; color: #5B6F65; margin-top: 2px; line-height: 1.35; }
+  .d1 .ann { margin: 0 18px; padding: 16px; display: flex; gap: 14px; align-items: center; }
+  .d1 .ann .ic { width: 52px; height: 52px; border-radius: 14px; background: #0B5F35; color: #fff; display: grid; place-items: center; font-size: 26px; }
+  .d1 .ann b { font-size: 16px; display: block; }
+  .d1 .ann span { font-size: 13px; color: #5B6F65; }
+  .d1 .sos { position: absolute; right: 18px; bottom: 102px; width: 66px; height: 66px; border-radius: 50%; background: #D93A3F; color: #fff; display: grid; place-items: center; font-weight: 800; font-size: 15px; box-shadow: 0 10px 22px -6px rgba(217,58,63,.6); border: 4px solid #fff; z-index: 5; }
+  .d1 .nav { height: 88px; background: #fff; display: flex; padding: 8px 6px 18px; box-shadow: 0 -6px 20px -10px rgba(0,0,0,.12); flex: none; }
+  .d1 .nav div { flex: 1; display: flex; flex-direction: column; align-items: center; gap: 4px; font-size: 12px; font-weight: 600; color: #6B7E74; }
+  .d1 .nav .ico { width: 56px; height: 32px; border-radius: 16px; display: grid; place-items: center; font-size: 24px; }
+  .d1 .nav .on { color: #0B5F35; }
+  .d1 .nav .on .ico { background: #DDF0E4; }
+  /* d1 – my id */
+  .d1 .hdr.small { padding-bottom: 150px; }
+  .d1 .hdr .title { font-size: 26px; font-weight: 700; margin-top: 14px; position: relative; z-index: 1; }
+  .d1 .hdr .sub { font-size: 15px; opacity: .85; margin-top: 2px; position: relative; z-index: 1; }
+  .d1 .idc { margin: -134px 18px 0; position: relative; z-index: 2; overflow: hidden; }
+  .d1 .idc .band { background: linear-gradient(90deg,#0E7A45,#13A05A); color: #fff; padding: 12px 18px; display: flex; justify-content: space-between; align-items: center; font-size: 12px; font-weight: 700; letter-spacing: .08em; }
+  .d1 .idc .body { padding: 18px; display: flex; gap: 16px; }
+  .d1 .photo { width: 92px; height: 112px; border-radius: 14px; background: linear-gradient(160deg,#E3F3E9,#C9E6D4); display: grid; place-items: center; color: #0B6B3A; font-size: 52px; flex: none; }
+  .d1 .idc h4 { font-size: 20px; line-height: 1.2; }
+  .d1 .idc .k { font-size: 11px; color: #6B7E74; text-transform: uppercase; letter-spacing: .08em; margin-top: 10px; }
+  .d1 .idc .v { font-size: 16px; font-weight: 700; }
+  .d1 .idc .foot { border-top: 1px dashed #D3DED7; padding: 12px 18px; display: flex; justify-content: space-between; font-size: 13px; color: #5B6F65; }
+  .d1 .idc .foot b { color: #0B6B3A; }
+  .d1 .list { margin: 0 18px; overflow: hidden; }
+  .d1 .li { display: flex; align-items: center; gap: 14px; padding: 16px; border-bottom: 1px solid #EEF3F0; }
+  .d1 .li:last-child { border-bottom: 0; }
+  .d1 .li .ic { width: 44px; height: 44px; border-radius: 12px; background: #E3F3E9; color: #0B6B3A; display: grid; place-items: center; font-size: 22px; }
+  .d1 .li > div:not(.ic) { flex: 1; }
+  .d1 .li b { display: block; font-size: 16px; }
+  .d1 .li span { font-size: 13px; color: #5B6F65; }
+  .d1 .li .chev { color: #9FB3A9; font-size: 24px; }
+
+  /* =========================================================
+     DESIGN 2 – PURE WHITE MINIMAL
+     ========================================================= */
+  .d2 { background: #FFFFFF; }
+  .d2 .top { display: flex; align-items: center; justify-content: space-between; padding: 8px 22px 0; }
+  .d2 .brand { display: flex; align-items: center; gap: 10px; font-weight: 700; font-size: 17px; color: #0A5C33; }
+  .d2 .brand i { width: 34px; height: 34px; border-radius: 10px; background: #0A7A42; color: #fff; display: grid; place-items: center; font-size: 19px; font-style: normal; }
+  .d2 .icons { display: flex; gap: 10px; }
+  .d2 .icons span { width: 46px; height: 46px; border-radius: 50%; border: 1px solid #E4EAE6; display: grid; place-items: center; font-size: 24px; color: #1E3A2C; position: relative; }
+  .d2 .icons em { position: absolute; top: 9px; right: 11px; width: 9px; height: 9px; border-radius: 50%; background: #E5484D; }
+  .d2 .greet { padding: 26px 22px 6px; }
+  .d2 .greet p { font-size: 16px; color: #66786F; }
+  .d2 .greet h2 { font-size: 34px; letter-spacing: -.025em; margin-top: 2px; }
+  .d2 .loc { display: inline-flex; gap: 6px; align-items: center; font-size: 14px; color: #0A7A42; font-weight: 600; margin-top: 10px; background: #F0F8F3; padding: 7px 12px; border-radius: 99px; }
+  .d2 .status { margin: 18px 20px 0; border: 1.5px solid #0A7A42; border-radius: 20px; padding: 18px; }
+  .d2 .status .row { display: flex; justify-content: space-between; align-items: center; }
+  .d2 .status .lbl { font-size: 13px; font-weight: 700; letter-spacing: .08em; text-transform: uppercase; color: #66786F; }
+  .d2 .status .no { font-size: 13px; color: #66786F; }
+  .d2 .status h3 { font-size: 22px; margin-top: 8px; letter-spacing: -.01em; }
+  .d2 .stepper { display: flex; align-items: center; margin: 18px 0 6px; }
+  .d2 .stepper .dot { width: 26px; height: 26px; border-radius: 50%; border: 2px solid #CFDAD3; background: #fff; display: grid; place-items: center; font-size: 15px; color: #fff; flex: none; }
+  .d2 .stepper .dot.done { background: #0A7A42; border-color: #0A7A42; }
+  .d2 .stepper .dot.cur { border-color: #0A7A42; box-shadow: 0 0 0 5px #E3F3E9; }
+  .d2 .stepper .dot.cur:after { content: ""; width: 10px; height: 10px; border-radius: 50%; background: #0A7A42; }
+  .d2 .stepper .ln { flex: 1; height: 2px; background: #CFDAD3; }
+  .d2 .stepper .ln.done { background: #0A7A42; }
+  .d2 .stepl { display: flex; justify-content: space-between; font-size: 12px; color: #66786F; }
+  .d2 .stepl b { color: #0A5C33; }
+  .d2 .btn { margin-top: 16px; height: 54px; border-radius: 14px; background: #0A7A42; color: #fff; font-size: 17px; font-weight: 600; display: flex; align-items: center; justify-content: center; gap: 6px; }
+  .d2 .sec { font-size: 13px; font-weight: 700; letter-spacing: .1em; text-transform: uppercase; color: #66786F; padding: 26px 22px 6px; display: flex; justify-content: space-between; }
+  .d2 .sec a { color: #0A7A42; letter-spacing: 0; text-transform: none; font-size: 15px; }
+  .d2 .rows { padding: 0 20px; }
+  .d2 .r { display: flex; align-items: center; gap: 14px; padding: 13px 0; border-bottom: 1px solid #EEF2EF; }
+  .d2 .r .ic { width: 46px; height: 46px; border-radius: 12px; background: #F0F8F3; color: #0A7A42; display: grid; place-items: center; font-size: 23px; }
+  .d2 .r > div:not(.ic) { flex: 1; }
+  .d2 .r b { display: block; font-size: 17px; font-weight: 600; }
+  .d2 .r span { font-size: 13px; color: #66786F; }
+  .d2 .r .chev { color: #A9B8AF; font-size: 24px; }
+  .d2 .sos { height: 46px; padding: 0 14px; border-radius: 23px; border: 1.5px solid #F2C9CA; background: #FFF6F6; color: #C8343A; display: flex; align-items: center; justify-content: center; gap: 8px; font-weight: 700; font-size: 16px; }
+  .d2 .nav { height: 88px; background: #fff; border-top: 1px solid #EDF1EE; display: flex; padding: 0 6px 18px; flex: none; }
+  .d2 .nav div { flex: 1; display: flex; flex-direction: column; align-items: center; justify-content: center; gap: 5px; font-size: 12px; font-weight: 600; color: #8A9A91; border-top: 3px solid transparent; }
+  .d2 .nav .ico { font-size: 25px; }
+  .d2 .nav .on { color: #0A7A42; border-top-color: #0A7A42; }
+  /* d2 – my id */
+  .d2 .pg { padding: 10px 22px 0; }
+  .d2 .pg h2 { font-size: 32px; letter-spacing: -.02em; }
+  .d2 .pg p { font-size: 15px; color: #66786F; margin-top: 4px; }
+  .d2 .idc { margin: 20px 20px 0; border: 1px solid #E1E8E3; border-radius: 20px; overflow: hidden; box-shadow: 0 1px 2px rgba(0,0,0,.04); position: relative; }
+  .d2 .idc .stripe { position: absolute; left: 0; top: 0; bottom: 0; width: 6px; background: #0A7A42; }
+  .d2 .idc .hd { padding: 16px 18px 0 24px; display: flex; justify-content: space-between; align-items: center; }
+  .d2 .idc .hd span { font-size: 12px; font-weight: 700; letter-spacing: .1em; color: #66786F; }
+  .d2 .verified { display: inline-flex; align-items: center; gap: 5px; color: #0A7A42; font-size: 13px; font-weight: 700; }
+  .d2 .idc .body { display: flex; gap: 16px; padding: 14px 18px 18px 24px; align-items: center; }
+  .d2 .photo { width: 78px; height: 78px; border-radius: 50%; background: #F0F8F3; color: #0A7A42; font-size: 42px; display: grid; place-items: center; border: 1px solid #D5E7DC; flex: none; }
+  .d2 .idc h4 { font-size: 21px; letter-spacing: -.01em; }
+  .d2 .idc .num { font-family: Consolas, monospace; font-size: 17px; color: #0A5C33; margin-top: 4px; letter-spacing: .04em; }
+  .d2 .kv { margin: 0 20px; }
+  .d2 .kv div { display: flex; justify-content: space-between; padding: 14px 0; border-bottom: 1px solid #EEF2EF; font-size: 16px; }
+  .d2 .kv span { color: #66786F; }
+  .d2 .kv b { font-weight: 600; }
+  .d2 .two { display: flex; gap: 12px; margin: 22px 20px 0; }
+  .d2 .two div { flex: 1; height: 54px; border-radius: 14px; display: flex; align-items: center; justify-content: center; gap: 8px; font-weight: 600; font-size: 16px; }
+  .d2 .two .p { background: #0A7A42; color: #fff; }
+  .d2 .two .o { border: 1.5px solid #CFDAD3; color: #1E3A2C; }
+
+  /* =========================================================
+     DESIGN 3 – SOFT MINT CARDS
+     ========================================================= */
+  .d3 { background: linear-gradient(180deg,#E6F4EC 0%,#F6FAF7 38%,#F6FAF7 100%); }
+  .d3 .top { display: flex; align-items: center; gap: 12px; padding: 8px 20px 0; }
+  .d3 .av { width: 52px; height: 52px; border-radius: 50%; background: #fff; color: #0C6E3D; display: grid; place-items: center; font-size: 28px; box-shadow: 0 4px 12px -4px rgba(12,110,61,.3); }
+  .d3 .top .who { flex: 1; }
+  .d3 .top .who p { font-size: 14px; color: #557063; }
+  .d3 .top .who b { font-size: 21px; }
+  .d3 .top .bell { width: 48px; height: 48px; border-radius: 16px; background: #fff; display: grid; place-items: center; font-size: 24px; color: #1E3A2C; position: relative; box-shadow: 0 4px 12px -6px rgba(0,0,0,.15); }
+  .d3 .top .bell em { position: absolute; top: 9px; right: 10px; width: 10px; height: 10px; border-radius: 50%; background: #E5484D; border: 2px solid #fff; }
+  .d3 .hero { margin: 20px 18px 0; border-radius: 26px; padding: 20px; color: #fff; background: linear-gradient(135deg,#0C6E3D 0%,#14995A 100%); position: relative; overflow: hidden; box-shadow: 0 18px 30px -16px rgba(12,110,61,.7); }
+  .d3 .hero:before { content: ""; position: absolute; width: 200px; height: 200px; border-radius: 50%; border: 28px solid rgba(255,255,255,.07); right: -70px; top: -80px; }
+  .d3 .hero:after { content: ""; position: absolute; width: 120px; height: 120px; border-radius: 50%; background: rgba(255,255,255,.06); right: 40px; bottom: -60px; }
+  .d3 .hero .lbl { font-size: 13px; opacity: .85; font-weight: 600; letter-spacing: .04em; }
+  .d3 .hero h3 { font-size: 24px; margin-top: 6px; padding-right: 56px; }
+  .d3 .hero .chip { display: inline-flex; align-items: center; gap: 6px; background: rgba(255,255,255,.18); padding: 6px 12px; border-radius: 99px; font-size: 14px; font-weight: 600; margin-top: 12px; }
+  .d3 .hero .bar { height: 8px; border-radius: 4px; background: rgba(255,255,255,.2); margin-top: 18px; overflow: hidden; }
+  .d3 .hero .bar i { display: block; width: 66%; height: 100%; background: #fff; border-radius: 4px; }
+  .d3 .hero .meta { display: flex; justify-content: space-between; font-size: 13px; opacity: .9; margin-top: 8px; }
+  .d3 .hero .go { position: absolute; right: 18px; top: 18px; width: 46px; height: 46px; border-radius: 50%; background: #fff; color: #0C6E3D; display: grid; place-items: center; font-size: 26px; z-index: 1; }
+  .d3 .sec { display: flex; justify-content: space-between; align-items: baseline; padding: 24px 20px 12px; }
+  .d3 .sec h3 { font-size: 20px; }
+  .d3 .sec a { font-size: 15px; color: #0C6E3D; font-weight: 700; }
+  .d3 .acts { display: grid; grid-template-columns: repeat(4,1fr); gap: 8px; padding: 0 14px; }
+  .d3 .act { display: flex; flex-direction: column; align-items: center; gap: 8px; text-align: center; font-size: 13px; font-weight: 600; line-height: 1.25; color: #1E3A2C; }
+  .d3 .act .ic { width: 64px; height: 64px; border-radius: 22px; background: #fff; color: #0C6E3D; display: grid; place-items: center; font-size: 28px; box-shadow: 0 6px 16px -8px rgba(12,110,61,.35); }
+  .d3 .act.hl .ic { background: #0C6E3D; color: #fff; }
+  .d3 .ann { margin: 0 18px; background: #fff; border-radius: 22px; overflow: hidden; box-shadow: 0 8px 20px -14px rgba(0,0,0,.25); }
+  .d3 .ann .img { height: 84px; background: linear-gradient(120deg,#CDEBD9,#E9F6EE); display: flex; align-items: center; padding: 0 18px; gap: 12px; color: #0C6E3D; }
+  .d3 .ann .img .big { font-size: 40px; }
+  .d3 .ann .img .date { background: #fff; border-radius: 12px; padding: 6px 10px; font-size: 12px; font-weight: 700; text-align: center; line-height: 1.1; }
+  .d3 .ann .img .date b { display: block; font-size: 20px; }
+  .d3 .ann .txt { padding: 12px 16px 14px; }
+  .d3 .ann .txt b { font-size: 16px; display: block; }
+  .d3 .ann .txt span { font-size: 13px; color: #557063; }
+  .d3 .sos { position: absolute; right: 22px; bottom: 112px; height: 56px; padding: 0 20px; border-radius: 28px; background: #D93A3F; color: #fff; display: flex; align-items: center; gap: 8px; font-weight: 800; font-size: 16px; box-shadow: 0 10px 22px -8px rgba(217,58,63,.7); z-index: 5; }
+  .d3 .nav { position: absolute; left: 16px; right: 16px; bottom: 22px; height: 72px; border-radius: 26px; background: #0E3B25; display: flex; align-items: center; padding: 0 8px; box-shadow: 0 14px 30px -12px rgba(14,59,37,.6); z-index: 6; }
+  .d3 .nav div { flex: 1; display: flex; flex-direction: column; align-items: center; gap: 3px; font-size: 11px; font-weight: 600; color: rgba(255,255,255,.6); }
+  .d3 .nav .ico { font-size: 24px; }
+  .d3 .nav .on { background: #fff; color: #0C6E3D; border-radius: 18px; padding: 8px 0; flex: 1.2; }
+  /* d3 – my id */
+  .d3 .pg { padding: 10px 20px 0; display: flex; justify-content: space-between; align-items: center; }
+  .d3 .pg h2 { font-size: 28px; }
+  .d3 .pg .bell { width: 48px; height: 48px; border-radius: 16px; background: #fff; display: grid; place-items: center; font-size: 24px; box-shadow: 0 4px 12px -6px rgba(0,0,0,.15); }
+  .d3 .idc { margin: 18px 18px 0; border-radius: 26px; padding: 20px; color: #fff; background: linear-gradient(135deg,#0C6E3D 0%,#14995A 100%); position: relative; overflow: hidden; box-shadow: 0 18px 30px -16px rgba(12,110,61,.7); }
+  .d3 .idc:before { content: ""; position: absolute; width: 240px; height: 240px; border-radius: 50%; border: 30px solid rgba(255,255,255,.07); right: -90px; bottom: -110px; }
+  .d3 .idc .hd { display: flex; justify-content: space-between; align-items: center; font-size: 12px; font-weight: 700; letter-spacing: .1em; opacity: .9; }
+  .d3 .idc .body { display: flex; gap: 16px; margin-top: 18px; align-items: center; position: relative; }
+  .d3 .idc .photo { width: 80px; height: 96px; border-radius: 16px; background: rgba(255,255,255,.18); display: grid; place-items: center; font-size: 46px; flex: none; }
+  .d3 .idc h4 { font-size: 21px; line-height: 1.2; }
+  .d3 .idc .num { font-family: Consolas, monospace; font-size: 18px; letter-spacing: .08em; margin-top: 6px; }
+  .d3 .idc .row { display: flex; gap: 22px; margin-top: 18px; position: relative; }
+  .d3 .idc .row span { display: block; font-size: 11px; opacity: .75; letter-spacing: .06em; text-transform: uppercase; }
+  .d3 .idc .row b { font-size: 15px; }
+  .d3 .qr { margin: 16px 18px 0; background: #fff; border-radius: 22px; padding: 16px; display: flex; gap: 16px; align-items: center; box-shadow: 0 8px 20px -14px rgba(0,0,0,.25); }
+  .d3 .qr .code { width: 88px; height: 88px; border-radius: 14px; background: #F0F8F3; color: #0E3B25; display: grid; place-items: center; font-size: 64px; flex: none; }
+  .d3 .qr b { font-size: 17px; display: block; }
+  .d3 .qr span { font-size: 13px; color: #557063; display: block; margin-top: 2px; }
+  .d3 .qr .mini { display: inline-flex; margin-top: 10px; background: #0C6E3D; color: #fff; font-size: 14px; font-weight: 700; padding: 8px 14px; border-radius: 12px; gap: 6px; align-items: center; }
+  .d3 .chips { display: grid; grid-template-columns: 1fr 1fr; gap: 12px; margin: 16px 18px 0; }
+  .d3 .chips div { background: #fff; border-radius: 20px; padding: 14px; display: flex; gap: 12px; align-items: center; box-shadow: 0 8px 20px -16px rgba(0,0,0,.3); }
+  .d3 .chips .ic { width: 42px; height: 42px; border-radius: 14px; background: #E6F4EC; color: #0C6E3D; display: grid; place-items: center; font-size: 22px; flex: none; }
+  .d3 .chips b { font-size: 14px; line-height: 1.25; }
+</style>
+</head>
+<body>
+
+<svg width="0" height="0" style="position:absolute">
+  <symbol id="home" viewBox="0 0 24 24"><path d="M10 20v-6h4v6h5v-8h3L12 3 2 12h3v8z"/></symbol>
+  <symbol id="doc" viewBox="0 0 24 24"><path d="M14 2H6c-1.1 0-2 .9-2 2v16c0 1.1.9 2 2 2h12c1.1 0 2-.9 2-2V8l-6-6zm2 16H8v-2h8v2zm0-4H8v-2h8v2zm-3-5V3.5L18.5 9H13z"/></symbol>
+  <symbol id="badge" viewBox="0 0 24 24"><path d="M20 7h-5V4c0-1.1-.9-2-2-2h-2c-1.1 0-2 .9-2 2v3H4c-1.1 0-2 .9-2 2v11c0 1.1.9 2 2 2h16c1.1 0 2-.9 2-2V9c0-1.1-.9-2-2-2zM9 12c.83 0 1.5.67 1.5 1.5S9.83 15 9 15s-1.5-.67-1.5-1.5S8.17 12 9 12zm3 6H6v-.75c0-1 2-1.5 3-1.5s3 .5 3 1.5V18zm1-9h-2V4h2v5zm5 7.5h-4V15h4v1.5zm0-3h-4V12h4v1.5z"/></symbol>
+  <symbol id="gift" viewBox="0 0 24 24"><path d="M20 6h-2.18c.11-.31.18-.65.18-1 0-1.66-1.34-3-3-3-1.05 0-1.96.54-2.5 1.35l-.5.67-.5-.68C10.96 2.54 10.05 2 9 2 7.34 2 6 3.34 6 5c0 .35.07.69.18 1H4c-1.11 0-1.99.89-1.99 2L2 19c0 1.11.89 2 2 2h16c1.11 0 2-.89 2-2V8c0-1.11-.89-2-2-2zm-5-2c.55 0 1 .45 1 1s-.45 1-1 1-1-.45-1-1 .45-1 1-1zM9 4c.55 0 1 .45 1 1s-.45 1-1 1-1-.45-1-1 .45-1 1-1zm11 15H4v-2h16v2zm0-5H4V8h5.08L7 10.83 8.62 12 11 8.76l1-1.36 1 1.36L15.38 12 17 10.83 14.92 8H20v6z"/></symbol>
+  <symbol id="person" viewBox="0 0 24 24"><path d="M12 12c2.21 0 4-1.79 4-4s-1.79-4-4-4-4 1.79-4 4 1.79 4 4 4zm0 2c-2.67 0-8 1.34-8 4v2h16v-2c0-2.66-5.33-4-8-4z"/></symbol>
+  <symbol id="bell" viewBox="0 0 24 24"><path d="M12 22c1.1 0 2-.9 2-2h-4c0 1.1.89 2 2 2zm6-6v-5c0-3.07-1.64-5.64-4.5-6.32V4c0-.83-.67-1.5-1.5-1.5s-1.5.67-1.5 1.5v.68C7.63 5.36 6 7.92 6 11v5l-2 2v1h16v-1l-2-2z"/></symbol>
+  <symbol id="upload" viewBox="0 0 24 24"><path d="M9 16h6v-6h4l-7-7-7 7h4zm-4 2h14v2H5z"/></symbol>
+  <symbol id="med" viewBox="0 0 24 24"><path d="M19 3H5c-1.1 0-2 .9-2 2v14c0 1.1.9 2 2 2h14c1.1 0 2-.9 2-2V5c0-1.1-.9-2-2-2zm-1 11h-4v4h-4v-4H6v-4h4V6h4v4h4v4z"/></symbol>
+  <symbol id="chat" viewBox="0 0 24 24"><path d="M21 6h-2v9H6v2c0 .55.45 1 1 1h11l4 4V7c0-.55-.45-1-1-1zm-4 6V3c0-.55-.45-1-1-1H3c-.55 0-1 .45-1 1v14l4-4h10c.55 0 1-.45 1-1z"/></symbol>
+  <symbol id="pin" viewBox="0 0 24 24"><path d="M12 2C8.13 2 5 5.13 5 9c0 5.25 7 13 7 13s7-7.75 7-13c0-3.87-3.13-7-7-7zm0 9.5c-1.38 0-2.5-1.12-2.5-2.5s1.12-2.5 2.5-2.5 2.5 1.12 2.5 2.5-1.12 2.5-2.5 2.5z"/></symbol>
+  <symbol id="chev" viewBox="0 0 24 24"><path d="M10 6 8.59 7.41 13.17 12l-4.58 4.59L10 18l6-6z"/></symbol>
+  <symbol id="check" viewBox="0 0 24 24"><path d="M12 2C6.48 2 2 6.48 2 12s4.48 10 10 10 10-4.48 10-10S17.52 2 12 2zm-2 15-5-5 1.41-1.41L10 14.17l7.59-7.59L19 8l-9 9z"/></symbol>
+  <symbol id="tick" viewBox="0 0 24 24"><path d="M9 16.17 4.83 12l-1.42 1.41L9 19 21 7l-1.41-1.41z"/></symbol>
+  <symbol id="qr" viewBox="0 0 24 24"><path d="M3 11h8V3H3v8zm2-6h4v4H5V5zM3 21h8v-8H3v8zm2-6h4v4H5v-4zM13 3v8h8V3h-8zm6 6h-4V5h4v4zm0 10h2v2h-2zm-6-6h2v2h-2zm2 2h2v2h-2zm-2 2h2v2h-2zm2 2h2v2h-2zm2-2h2v2h-2zm0-4h2v2h-2zm2 2h2v2h-2z"/></symbol>
+  <symbol id="mega" viewBox="0 0 24 24"><path d="M18 11v2h4v-2h-4zm-2 6.61c.96.71 2.21 1.65 3.2 2.39.4-.53.8-1.07 1.2-1.6-.99-.74-2.24-1.68-3.2-2.4-.4.54-.8 1.08-1.2 1.61zM20.4 5.6c-.4-.53-.8-1.07-1.2-1.6-.99.74-2.24 1.68-3.2 2.4.4.53.8 1.07 1.2 1.6.96-.72 2.21-1.65 3.2-2.4zM4 9c-1.1 0-2 .9-2 2v2c0 1.1.9 2 2 2h1v4h2v-4h1l5 3V6L8 9H4zm11.5 3c0-1.33-.58-2.53-1.5-3.35v6.69c.92-.81 1.5-2.01 1.5-3.34z"/></symbol>
+  <symbol id="phone" viewBox="0 0 24 24"><path d="M6.62 10.79c1.44 2.83 3.76 5.14 6.59 6.59l2.2-2.2c.27-.27.67-.36 1.02-.24 1.12.37 2.33.57 3.57.57.55 0 1 .45 1 1V20c0 .55-.45 1-1 1-9.39 0-17-7.61-17-17 0-.55.45-1 1-1h3.5c.55 0 1 .45 1 1 0 1.25.2 2.45.57 3.57.11.35.03.74-.25 1.02l-2.2 2.2z"/></symbol>
+  <symbol id="refresh" viewBox="0 0 24 24"><path d="M17.65 6.35A7.958 7.958 0 0 0 12 4c-4.42 0-7.99 3.58-7.99 8s3.57 8 7.99 8c3.73 0 6.84-2.55 7.73-6h-2.08A5.99 5.99 0 0 1 12 18c-3.31 0-6-2.69-6-6s2.69-6 6-6c1.66 0 3.14.69 4.22 1.78L13 11h7V4l-2.35 2.35z"/></symbol>
+  <symbol id="history" viewBox="0 0 24 24"><path d="M13 3a9 9 0 0 0-9 9H1l3.89 3.89.07.14L9 12H6c0-3.87 3.13-7 7-7s7 3.13 7 7-3.13 7-7 7c-1.93 0-3.68-.79-4.94-2.06l-1.42 1.42A8.954 8.954 0 0 0 13 21a9 9 0 0 0 0-18zm-1 5v5l4.28 2.54.72-1.21-3.5-2.08V8H12z"/></symbol>
+  <symbol id="leaf" viewBox="0 0 24 24"><path d="M17 8C8 10 5.9 16.17 3.82 21.34l1.89.66.95-2.3c.48.17.98.3 1.34.3C19 20 22 3 22 3c-1 2-8 2.25-13 3.25S2 11.5 2 13.5s1.75 3.75 1.75 3.75C7 8 17 8 17 8z"/></symbol>
+</svg>
+
+<script>
+  // tiny helper: <x-i n="home"></x-i> -> inline svg icon
+  document.addEventListener('DOMContentLoaded', () => {
+    document.querySelectorAll('x-i').forEach(el => {
+      el.outerHTML = '<svg class="i"><use href="#' + el.getAttribute('n') + '"/></svg>';
+    });
+  });
+</script>
+
+<!-- Status bar fragment reused (light/dark via color) -->
+<template id="sb">
+  <div class="status-bar"><span>9:41</span><span class="dots"><span class="sig"><i style="height:4px"></i><i style="height:7px"></i><i style="height:10px"></i><i style="height:12px"></i></span><span class="bat"></span></span></div>
+</template>
+
+<!-- ======================= DESIGN 1 ======================= -->
+<section class="board" id="b1">
+  <div class="side">
+    <div class="tag">Design 01</div>
+    <h1>Forest Header</h1>
+    <p>A refined take on the current look. A deep forest-green header carries the greeting, and the application status card floats over it so the most important thing is always seen first.</p>
+    <ul>
+      <li>Strong, trustworthy government feel</li>
+      <li>Status card overlaps the header for clear hierarchy</li>
+      <li>2 × 2 action tiles with large touch areas</li>
+      <li>Closest to today's layout — easiest to adopt</li>
+    </ul>
+    <div class="sw-title">Palette</div>
+    <div class="swatches">
+      <div class="sw"><b style="background:#0B5F35"></b><span>#0B5F35</span></div>
+      <div class="sw"><b style="background:#13A05A"></b><span>#13A05A</span></div>
+      <div class="sw"><b style="background:#E3F3E9"></b><span>#E3F3E9</span></div>
+      <div class="sw"><b style="background:#F3F7F4"></b><span>#F3F7F4</span></div>
+      <div class="sw"><b style="background:#FFFFFF"></b><span>#FFFFFF</span></div>
+    </div>
+  </div>
+
+  <!-- Home -->
+  <div class="phone d1"><div class="screen">
+    <div class="scroll">
+      <div class="hdr">
+        <div class="status-bar" style="color:#fff;padding-left:12px;padding-right:8px"><span>9:41</span><span class="dots"><span class="sig"><i style="height:4px"></i><i style="height:7px"></i><i style="height:10px"></i><i style="height:12px"></i></span><span class="bat"></span></span></div>
+        <div class="top">
+          <div class="loc"><x-i n="pin"></x-i> Brgy. Poblacion, Cebu City</div>
+          <div class="bell"><x-i n="bell"></x-i><em>2</em></div>
+        </div>
+        <div class="greet">
+          <h2>Good morning, Lola Rosa</h2>
+          <p>Monday, October 5, 2026</p>
+        </div>
+      </div>
+      <div class="card status">
+        <div class="row"><h3>Application Status</h3><span class="pill">Under review</span></div>
+        <div class="no">Application #SC-2026-00418</div>
+        <div class="steps"><i class="on"></i><i class="on"></i><i></i><i></i></div>
+        <div class="steps-l"><span>Submitted</span><span>Review</span><span>Approved</span><span>ID ready</span></div>
+        <div class="btn">View status <x-i n="chev"></x-i></div>
+      </div>
+      <div class="sec"><h3>Quick actions</h3></div>
+      <div class="grid">
+        <div class="tile"><div class="ic"><x-i n="upload"></x-i></div><b>Upload papers</b><span>Send photos of your documents</span></div>
+        <div class="tile"><div class="ic"><x-i n="med"></x-i></div><b>Medical help</b><span>Request medicine or aid</span></div>
+        <div class="tile"><div class="ic"><x-i n="chat"></x-i></div><b>Ask for help</b><span>Message the OSCA office</span></div>
+        <div class="tile"><div class="ic"><x-i n="badge"></x-i></div><b>ID services</b><span>Replace or update your ID</span></div>
+      </div>
+      <div class="sec"><h3>Latest announcement</h3><a>View all</a></div>
+      <div class="card ann"><div class="ic"><x-i n="mega"></x-i></div><div><b>Social pension payout – Oct 12</b><span>Bring your Senior ID to the barangay hall.</span></div></div>
+    </div>
+    <div class="sos">SOS</div>
+    <div class="nav">
+      <div class="on"><span class="ico"><x-i n="home"></x-i></span>Home</div>
+      <div><span class="ico"><x-i n="doc"></x-i></span>Applications</div>
+      <div><span class="ico"><x-i n="badge"></x-i></span>My ID</div>
+      <div><span class="ico"><x-i n="gift"></x-i></span>Benefits</div>
+      <div><span class="ico"><x-i n="person"></x-i></span>Account</div>
+    </div>
+  </div></div>
+
+  <!-- My ID -->
+  <div class="phone d1"><div class="screen">
+    <div class="scroll">
+      <div class="hdr small">
+        <div class="status-bar" style="color:#fff;padding-left:12px;padding-right:8px"><span>9:41</span><span class="dots"><span class="sig"><i style="height:4px"></i><i style="height:7px"></i><i style="height:10px"></i><i style="height:12px"></i></span><span class="bat"></span></span></div>
+        <div class="title">My Senior ID</div>
+        <div class="sub">Show this to cashiers for your 20% discount</div>
+      </div>
+      <div class="card idc">
+        <div class="band"><span>OSCA · SENIOR CITIZEN ID</span><span style="display:flex;gap:5px;align-items:center"><x-i n="check"></x-i> VERIFIED</span></div>
+        <div class="body">
+          <div class="photo"><x-i n="person"></x-i></div>
+          <div>
+            <h4>Rosa M. Dela Cruz</h4>
+            <div class="k">OSCA ID No.</div><div class="v">0722-2026-00418</div>
+            <div class="k">Birthdate</div><div class="v">March 14, 1956</div>
+          </div>
+        </div>
+        <div class="foot"><span>Valid until <b>Oct 2031</b></span><span>Cebu City</span></div>
+      </div>
+      <div class="btn" style="margin:16px 18px 0;height:58px;border-radius:16px;background:#0B5F35;color:#fff;font-size:17px;font-weight:700;display:flex;align-items:center;justify-content:center;gap:10px"><span style="font-size:24px"><x-i n="qr"></x-i></span> Show QR to cashier</div>
+      <div class="sec"><h3>ID services</h3></div>
+      <div class="card list">
+        <div class="li"><div class="ic"><x-i n="refresh"></x-i></div><div><b>Replace my ID</b><span>Lost or damaged card</span></div><span class="chev"><x-i n="chev"></x-i></span></div>
+        <div class="li"><div class="ic"><x-i n="doc"></x-i></div><div><b>Correct my details</b><span>Fix name, birthdate or address</span></div><span class="chev"><x-i n="chev"></x-i></span></div>
+        <div class="li"><div class="ic"><x-i n="history"></x-i></div><div><b>Purchase history</b><span>Discounts you've used</span></div><span class="chev"><x-i n="chev"></x-i></span></div>
+      </div>
+    </div>
+    <div class="nav">
+      <div><span class="ico"><x-i n="home"></x-i></span>Home</div>
+      <div><span class="ico"><x-i n="doc"></x-i></span>Applications</div>
+      <div class="on"><span class="ico"><x-i n="badge"></x-i></span>My ID</div>
+      <div><span class="ico"><x-i n="gift"></x-i></span>Benefits</div>
+      <div><span class="ico"><x-i n="person"></x-i></span>Account</div>
+    </div>
+  </div></div>
+</section>
+
+<!-- ======================= DESIGN 2 ======================= -->
+<section class="board" id="b2">
+  <div class="side">
+    <div class="tag">Design 02</div>
+    <h1>Pure White Minimal</h1>
+    <p>Calm, airy and modern. White space does the work, and green is used only where it matters — the brand mark, the current step and the main button. Feels like a premium banking app.</p>
+    <ul>
+      <li>Maximum contrast and readability</li>
+      <li>Step-by-step progress tracker for the application</li>
+      <li>Actions as simple list rows — one tap, no guessing</li>
+      <li>SOS kept visible but calm, not alarming</li>
+    </ul>
+    <div class="sw-title">Palette</div>
+    <div class="swatches">
+      <div class="sw"><b style="background:#0A5C33"></b><span>#0A5C33</span></div>
+      <div class="sw"><b style="background:#0A7A42"></b><span>#0A7A42</span></div>
+      <div class="sw"><b style="background:#F0F8F3"></b><span>#F0F8F3</span></div>
+      <div class="sw"><b style="background:#EEF2EF"></b><span>#EEF2EF</span></div>
+      <div class="sw"><b style="background:#FFFFFF"></b><span>#FFFFFF</span></div>
+    </div>
+  </div>
+
+  <!-- Home -->
+  <div class="phone d2"><div class="screen">
+    <div class="status-bar"><span>9:41</span><span class="dots"><span class="sig"><i style="height:4px"></i><i style="height:7px"></i><i style="height:10px"></i><i style="height:12px"></i></span><span class="bat"></span></span></div>
+    <div class="scroll">
+      <div class="top">
+        <div class="brand"><i><x-i n="leaf"></x-i></i>SeniorCompanion</div>
+        <div class="icons"><div class="sos"><x-i n="phone"></x-i> SOS</div><span><x-i n="bell"></x-i><em></em></span></div>
+      </div>
+      <div class="greet">
+        <p>Good morning,</p>
+        <h2>Lola Rosa</h2>
+        <div class="loc"><x-i n="pin"></x-i> Brgy. Poblacion, Cebu City</div>
+      </div>
+      <div class="status">
+        <div class="row"><span class="lbl">Your application</span><span class="no">#SC-2026-00418</span></div>
+        <h3>Being reviewed by OSCA</h3>
+        <div class="stepper">
+          <span class="dot done"><x-i n="tick"></x-i></span><span class="ln done"></span>
+          <span class="dot cur"></span><span class="ln"></span>
+          <span class="dot"></span><span class="ln"></span>
+          <span class="dot"></span>
+        </div>
+        <div class="stepl"><span>Sent</span><b>Review</b><span>Approved</span><span>ID ready</span></div>
+        <div class="btn">View details <x-i n="chev"></x-i></div>
+      </div>
+      <div class="sec"><span>What would you like to do?</span></div>
+      <div class="rows">
+        <div class="r"><div class="ic"><x-i n="upload"></x-i></div><div><b>Upload papers</b><span>Send photos of your documents</span></div><span class="chev"><x-i n="chev"></x-i></span></div>
+        <div class="r"><div class="ic"><x-i n="med"></x-i></div><div><b>Medical help</b><span>Request medicine or aid</span></div><span class="chev"><x-i n="chev"></x-i></span></div>
+        <div class="r"><div class="ic"><x-i n="chat"></x-i></div><div><b>Ask for help</b><span>Message the OSCA office</span></div><span class="chev"><x-i n="chev"></x-i></span></div>
+      </div>
+    </div>
+    <div class="nav">
+      <div class="on"><span class="ico"><x-i n="home"></x-i></span>Home</div>
+      <div><span class="ico"><x-i n="doc"></x-i></span>Applications</div>
+      <div><span class="ico"><x-i n="badge"></x-i></span>My ID</div>
+      <div><span class="ico"><x-i n="gift"></x-i></span>Benefits</div>
+      <div><span class="ico"><x-i n="person"></x-i></span>Account</div>
+    </div>
+  </div></div>
+
+  <!-- My ID -->
+  <div class="phone d2"><div class="screen">
+    <div class="status-bar"><span>9:41</span><span class="dots"><span class="sig"><i style="height:4px"></i><i style="height:7px"></i><i style="height:10px"></i><i style="height:12px"></i></span><span class="bat"></span></span></div>
+    <div class="scroll">
+      <div class="pg">
+        <h2>My Senior ID</h2>
+        <p>Show this to cashiers for your 20% discount.</p>
+      </div>
+      <div class="idc">
+        <div class="stripe"></div>
+        <div class="hd"><span>OSCA · CEBU CITY</span><span class="verified"><x-i n="check"></x-i> Verified</span></div>
+        <div class="body">
+          <div class="photo"><x-i n="person"></x-i></div>
+          <div><h4>Rosa M. Dela Cruz</h4><div class="num">0722-2026-00418</div></div>
+        </div>
+      </div>
+      <div class="two">
+        <div class="p"><x-i n="qr"></x-i> Show QR</div>
+        <div class="o"><x-i n="refresh"></x-i> Replace ID</div>
+      </div>
+      <div class="sec"><span>ID details</span></div>
+      <div class="kv">
+        <div><span>Birthdate</span><b>March 14, 1956</b></div>
+        <div><span>Age</span><b>70 years old</b></div>
+        <div><span>Date issued</span><b>Oct 1, 2026</b></div>
+        <div><span>Valid until</span><b>Oct 1, 2031</b></div>
+        <div><span>Barangay</span><b>Poblacion</b></div>
+      </div>
+    </div>
+    <div class="nav">
+      <div><span class="ico"><x-i n="home"></x-i></span>Home</div>
+      <div><span class="ico"><x-i n="doc"></x-i></span>Applications</div>
+      <div class="on"><span class="ico"><x-i n="badge"></x-i></span>My ID</div>
+      <div><span class="ico"><x-i n="gift"></x-i></span>Benefits</div>
+      <div><span class="ico"><x-i n="person"></x-i></span>Account</div>
+    </div>
+  </div></div>
+</section>
+
+<!-- ======================= DESIGN 3 ======================= -->
+<section class="board" id="b3">
+  <div class="side">
+    <div class="tag">Design 03</div>
+    <h1>Soft Mint Cards</h1>
+    <p>Friendly and warm. A soft mint background with floating white cards, a bold green gradient hero for the application, and a floating dark-green tab bar. Modern, but still gentle on the eyes.</p>
+    <ul>
+      <li>Hero card makes progress feel encouraging</li>
+      <li>Round icon shortcuts, like familiar phone apps</li>
+      <li>Digital ID looks like a real card</li>
+      <li>Most "modern app" feel of the three</li>
+    </ul>
+    <div class="sw-title">Palette</div>
+    <div class="swatches">
+      <div class="sw"><b style="background:#0E3B25"></b><span>#0E3B25</span></div>
+      <div class="sw"><b style="background:#0C6E3D"></b><span>#0C6E3D</span></div>
+      <div class="sw"><b style="background:#14995A"></b><span>#14995A</span></div>
+      <div class="sw"><b style="background:#E6F4EC"></b><span>#E6F4EC</span></div>
+      <div class="sw"><b style="background:#FFFFFF"></b><span>#FFFFFF</span></div>
+    </div>
+  </div>
+
+  <!-- Home -->
+  <div class="phone d3"><div class="screen">
+    <div class="status-bar"><span>9:41</span><span class="dots"><span class="sig"><i style="height:4px"></i><i style="height:7px"></i><i style="height:10px"></i><i style="height:12px"></i></span><span class="bat"></span></span></div>
+    <div class="scroll">
+      <div class="top">
+        <div class="av"><x-i n="person"></x-i></div>
+        <div class="who"><p>Good morning 👋</p><b>Lola Rosa</b></div>
+        <div class="bell"><x-i n="bell"></x-i><em></em></div>
+      </div>
+      <div class="hero">
+        <div class="go"><x-i n="chev"></x-i></div>
+        <div class="lbl">APPLICATION #SC-2026-00418</div>
+        <h3>Your ID is being reviewed</h3>
+        <div class="chip"><x-i n="history"></x-i> Step 2 of 3 · Updated today</div>
+        <div class="bar"><i></i></div>
+        <div class="meta"><span>Sent Sep 28</span><span>Est. ready Oct 15</span></div>
+      </div>
+      <div class="sec"><h3>Quick actions</h3></div>
+      <div class="acts">
+        <div class="act hl"><div class="ic"><x-i n="upload"></x-i></div>Upload papers</div>
+        <div class="act"><div class="ic"><x-i n="med"></x-i></div>Medical help</div>
+        <div class="act"><div class="ic"><x-i n="chat"></x-i></div>Ask for help</div>
+        <div class="act"><div class="ic"><x-i n="badge"></x-i></div>ID services</div>
+      </div>
+      <div class="sec"><h3>Announcements</h3><a>View all</a></div>
+      <div class="ann">
+        <div class="img"><div class="date">OCT<b>12</b></div><div style="flex:1;font-weight:700;font-size:15px">Social pension payout</div><span class="big"><x-i n="mega"></x-i></span></div>
+        <div class="txt"><b>Bring your Senior ID</b><span>Barangay hall, 8:00 AM – 3:00 PM</span></div>
+      </div>
+    </div>
+    <div class="sos"><x-i n="phone"></x-i> SOS</div>
+    <div class="nav">
+      <div class="on"><span class="ico"><x-i n="home"></x-i></span>Home</div>
+      <div><span class="ico"><x-i n="doc"></x-i></span>Requests</div>
+      <div><span class="ico"><x-i n="badge"></x-i></span>My ID</div>
+      <div><span class="ico"><x-i n="gift"></x-i></span>Benefits</div>
+      <div><span class="ico"><x-i n="person"></x-i></span>Account</div>
+    </div>
+  </div></div>
+
+  <!-- My ID -->
+  <div class="phone d3"><div class="screen">
+    <div class="status-bar"><span>9:41</span><span class="dots"><span class="sig"><i style="height:4px"></i><i style="height:7px"></i><i style="height:10px"></i><i style="height:12px"></i></span><span class="bat"></span></span></div>
+    <div class="scroll">
+      <div class="pg"><h2>My Senior ID</h2><div class="bell"><x-i n="bell"></x-i></div></div>
+      <div class="idc">
+        <div class="hd"><span>REPUBLIC OF THE PHILIPPINES · OSCA</span><x-i n="leaf"></x-i></div>
+        <div class="body">
+          <div class="photo"><x-i n="person"></x-i></div>
+          <div><h4>Rosa M.<br>Dela Cruz</h4><div class="num">0722 2026 00418</div></div>
+        </div>
+        <div class="row">
+          <div><span>Born</span><b>03/14/1956</b></div>
+          <div><span>Valid until</span><b>10/2031</b></div>
+          <div><span>City</span><b>Cebu</b></div>
+        </div>
+      </div>
+      <div class="qr">
+        <div class="code"><x-i n="qr"></x-i></div>
+        <div><b>Pay with your discount</b><span>Let the cashier scan this code for 20% off and VAT-free.</span><div class="mini"><x-i n="qr"></x-i> Open QR</div></div>
+      </div>
+      <div class="chips">
+        <div><span class="ic"><x-i n="refresh"></x-i></span><b>Replace my ID</b></div>
+        <div><span class="ic"><x-i n="doc"></x-i></span><b>Correct details</b></div>
+        <div><span class="ic"><x-i n="history"></x-i></span><b>Purchase history</b></div>
+        <div><span class="ic"><x-i n="gift"></x-i></span><b>My benefits</b></div>
+      </div>
+    </div>
+    <div class="nav">
+      <div><span class="ico"><x-i n="home"></x-i></span>Home</div>
+      <div><span class="ico"><x-i n="doc"></x-i></span>Requests</div>
+      <div class="on"><span class="ico"><x-i n="badge"></x-i></span>My ID</div>
+      <div><span class="ico"><x-i n="gift"></x-i></span>Benefits</div>
+      <div><span class="ico"><x-i n="person"></x-i></span>Account</div>
+    </div>
+  </div></div>
+</section>
+
+<script>
+  const d = new URLSearchParams(location.search).get('d') || '1';
+  document.getElementById('b' + d).classList.add('on');
+</script>
+</body>
+</html>

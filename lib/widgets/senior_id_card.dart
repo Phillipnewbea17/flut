@@ -3,8 +3,9 @@ import 'package:intl/intl.dart';
 
 import '../models/senior_id.dart';
 import '../theme/app_colors.dart';
+import 'status_pill.dart';
 
-/// The digital Senior Citizen ID card in My Wallet.
+/// The digital Senior Citizen ID card (My ID).
 /// When [seniorId] is null the card says the ID is not ready yet.
 class SeniorIdCard extends StatelessWidget {
   final SeniorId? seniorId;
@@ -20,41 +21,66 @@ class SeniorIdCard extends StatelessWidget {
   Widget build(BuildContext context) {
     final id = seniorId;
     return Container(
-      padding: const EdgeInsets.all(22),
+      clipBehavior: Clip.antiAlias,
       decoration: BoxDecoration(
         borderRadius: BorderRadius.circular(28),
-        gradient: const LinearGradient(
-          begin: Alignment.topLeft,
-          end: Alignment.bottomRight,
-          colors: [AppColors.primaryDark, AppColors.primaryBright],
-        ),
+        gradient: AppColors.heroGradient,
         boxShadow: const [
-          BoxShadow(color: Colors.black26, blurRadius: 14, offset: Offset(0, 6)),
+          BoxShadow(
+            color: Color(0x660C6E3D),
+            blurRadius: 28,
+            offset: Offset(0, 14),
+          ),
         ],
       ),
-      child: id == null ? _pending() : _issued(id),
+      child: Stack(
+        children: [
+          // A soft ring in the corner, like a printed card pattern.
+          Positioned(
+            right: -90,
+            bottom: -110,
+            child: Container(
+              width: 240,
+              height: 240,
+              decoration: BoxDecoration(
+                shape: BoxShape.circle,
+                border: Border.all(color: const Color(0x12FFFFFF), width: 30),
+              ),
+            ),
+          ),
+          Padding(
+            padding: const EdgeInsets.all(22),
+            child: id == null ? _pending() : _issued(id),
+          ),
+        ],
+      ),
     );
   }
 
   Widget _top(String right) {
     return Row(
       children: [
-        const Icon(Icons.favorite, color: Colors.white, size: 26),
+        const Icon(Icons.eco, color: Colors.white, size: 20),
         const SizedBox(width: 10),
         const Expanded(
           child: Text(
             'SENIOR CITIZEN ID',
             style: TextStyle(
               color: Colors.white,
-              fontSize: 17,
+              fontSize: 12,
               fontWeight: FontWeight.w700,
               letterSpacing: 1.2,
             ),
           ),
         ),
-        Text(
-          right,
-          style: const TextStyle(color: Colors.white, fontSize: 15),
+        const SizedBox(width: 8),
+        // Flexible: with big text it wraps instead of running off the card.
+        Flexible(
+          child: Text(
+            right,
+            textAlign: TextAlign.end,
+            style: const TextStyle(color: Colors.white, fontSize: 12),
+          ),
         ),
       ],
     );
@@ -70,7 +96,7 @@ class SeniorIdCard extends StatelessWidget {
           fallbackName.isEmpty ? 'Your ID' : fallbackName,
           style: const TextStyle(
             color: Colors.white,
-            fontSize: 26,
+            fontSize: 21,
             fontWeight: FontWeight.w700,
           ),
         ),
@@ -78,13 +104,13 @@ class SeniorIdCard extends StatelessWidget {
         const Row(
           crossAxisAlignment: CrossAxisAlignment.start,
           children: [
-            Icon(Icons.hourglass_top, color: Colors.white, size: 24),
+            Icon(Icons.hourglass_top, color: Colors.white, size: 20),
             SizedBox(width: 10),
             Expanded(
               child: Text(
                 'Your digital ID will appear here when your application '
                 'is approved.',
-                style: TextStyle(color: Colors.white, fontSize: 18, height: 1.4),
+                style: TextStyle(color: Colors.white, fontSize: 15, height: 1.4),
               ),
             ),
           ],
@@ -100,14 +126,32 @@ class SeniorIdCard extends StatelessWidget {
       children: [
         _top(id.issuedBy),
         const SizedBox(height: 20),
-        Text(
-          id.fullName,
-          style: const TextStyle(
-            color: Colors.white,
-            fontSize: 28,
-            fontWeight: FontWeight.w700,
-            height: 1.2,
-          ),
+        Row(
+          crossAxisAlignment: CrossAxisAlignment.start,
+          children: [
+            if (id.photoUrl.isNotEmpty) ...[
+              _Photo(url: id.photoUrl),
+              const SizedBox(width: 14),
+            ],
+            Expanded(
+              child: Column(
+                crossAxisAlignment: CrossAxisAlignment.start,
+                children: [
+                  Text(
+                    id.fullName,
+                    style: const TextStyle(
+                      color: Colors.white,
+                      fontSize: 21,
+                      fontWeight: FontWeight.w700,
+                      height: 1.2,
+                    ),
+                  ),
+                  const SizedBox(height: 10),
+                  _StatusBadge(status: id.status),
+                ],
+              ),
+            ),
+          ],
         ),
         const SizedBox(height: 16),
         _field('ID number', id.idNumber, big: true),
@@ -134,7 +178,7 @@ class SeniorIdCard extends StatelessWidget {
           label.toUpperCase(),
           style: const TextStyle(
             color: Color(0xCCFFFFFF),
-            fontSize: 13,
+            fontSize: 11,
             letterSpacing: 1,
           ),
         ),
@@ -143,12 +187,74 @@ class SeniorIdCard extends StatelessWidget {
           value,
           style: TextStyle(
             color: Colors.white,
-            fontSize: big ? 24 : 18,
+            fontSize: big ? 18 : 15,
             fontWeight: big ? FontWeight.w700 : FontWeight.w500,
             letterSpacing: big ? 1.5 : 0,
           ),
         ),
       ],
+    );
+  }
+}
+
+/// "Valid", "For replacement"... on the card: white pill, icon and words.
+class _StatusBadge extends StatelessWidget {
+  final SeniorIdStatus status;
+
+  const _StatusBadge({required this.status});
+
+  @override
+  Widget build(BuildContext context) {
+    final look = StatusLook.seniorId(status);
+    return Container(
+      padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 6),
+      decoration: BoxDecoration(
+        color: Colors.white,
+        borderRadius: BorderRadius.circular(20),
+      ),
+      child: Row(
+        mainAxisSize: MainAxisSize.min,
+        children: [
+          Icon(look.icon, color: look.color, size: 18),
+          const SizedBox(width: 6),
+          Flexible(
+            child: Text(
+              look.label,
+              style: const TextStyle(
+                color: AppColors.textPrimary,
+                fontSize: 14,
+                fontWeight: FontWeight.w700,
+              ),
+            ),
+          ),
+        ],
+      ),
+    );
+  }
+}
+
+/// The ID photo from the OSCA office (needs internet).
+class _Photo extends StatelessWidget {
+  final String url;
+
+  const _Photo({required this.url});
+
+  @override
+  Widget build(BuildContext context) {
+    return ClipRRect(
+      borderRadius: BorderRadius.circular(16),
+      child: Container(
+        width: 80,
+        height: 96,
+        color: const Color(0x2EFFFFFF),
+        child: Image.network(
+          url,
+          fit: BoxFit.cover,
+          semanticLabel: 'ID photo',
+          errorBuilder: (context, error, stack) =>
+              const Icon(Icons.person, color: Colors.white, size: 44),
+        ),
+      ),
     );
   }
 }

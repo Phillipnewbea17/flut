@@ -7,6 +7,9 @@ class DocumentService {
 
   final ApiClient _api;
 
+  /// False without a backend address: then nothing can be sent.
+  bool get sendsToOffice => _api.isLive('/documents');
+
   Future<void> upload(DocumentItem item) async {
     // Sending the same clientId again replaces the earlier photo.
     final result = await _api.postFile(
@@ -24,9 +27,11 @@ class DocumentService {
     final result = await _api.post('/application/submit', {
       'documents': documents.map((d) => d.id).toList(),
     });
-    if (result['ok'] != true) {
+    final reference = result['reference'];
+    // Only the OSCA office's own reference number counts as "sent".
+    if (result['ok'] != true || reference is! String || reference.isEmpty) {
       throw const ApiException('The application was not sent. Please try again.');
     }
-    return result['reference'] as String? ?? ApiClient.newReference();
+    return reference;
   }
 }

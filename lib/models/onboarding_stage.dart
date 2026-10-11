@@ -1,44 +1,73 @@
-/// Where the user is in the onboarding flow.
-/// The router reads this to decide which screen to show, so a user who
-/// closes the app mid-setup resumes at the right step.
+/// Where the user is in signing in.
+/// The router reads this (with [AuthFlow]) to decide which screen to show.
+///
+/// Only [signedOut], [identitySetup] and [completed] are saved on the phone.
+/// The others last only while the app is open: the code, the verification
+/// token and the MPIN are never saved, so after a restart the steps start
+/// again.
 enum OnboardingStage {
-  splash, // app just opened
-  welcome, // intro carousel with the illustrations (first launch only)
-  phoneEntry, // "Log in with your phone number"
-  otpVerify, // "Enter your 4-digit code" (Step 1 of 4)
-  mpinSetup, // create + confirm MPIN (Step 2 of 4)
-  roleSelection, // "Who is using this phone?" (Step 3 of 4)
-  emergencySetup, // "Emergency contact" (Step 4 of 4)
-  completed; // goes to the tab shell
+  signedOut, // Welcome, Create Account name, Login or Forgot MPIN number
+  phoneEntry, // Create Account: mobile number (after the name)
+  otpVerify, // "Enter the 4-digit code"
+  mpinSetup, // create a new MPIN (Create Account or Forgot MPIN)
+  mpinConfirm, // type the new MPIN again
+  mpinEntry, // Login: "Enter your MPIN"
+  identitySetup, // linking the senior citizen record (outside sign-in)
+  completed; // signed in: the tabs
 
-  /// Step number shown in the green header ("Step 3 of 4"), or null.
-  int? get stepNumber {
-    switch (this) {
-      case OnboardingStage.otpVerify:
-        return 1;
-      case OnboardingStage.mpinSetup:
-        return 2;
-      case OnboardingStage.roleSelection:
-        return 3;
-      case OnboardingStage.emergencySetup:
-        return 4;
-      default:
-        return null;
-    }
-  }
-
-  static const int totalSteps = 4;
-
-  /// "Step 3 of 4", or null for stages without a step number.
-  String? get stepLabel {
-    final n = stepNumber;
-    return n == null ? null : 'Step $n of $totalSteps';
-  }
+  /// True for the stages that are kept after the app is closed.
+  bool get isSaved =>
+      this == OnboardingStage.signedOut ||
+      this == OnboardingStage.identitySetup ||
+      this == OnboardingStage.completed;
 
   static OnboardingStage fromName(String? name) {
-    return OnboardingStage.values.firstWhere(
-      (s) => s.name == name,
-      orElse: () => OnboardingStage.splash,
-    );
+    switch (name) {
+      // Older builds asked "Who is using this phone?" at this step.
+      case 'identitySetup':
+      case 'roleSelection':
+        return OnboardingStage.identitySetup;
+      // Older builds had an emergency contact step after the identity.
+      case 'completed':
+      case 'emergencySetup':
+        return OnboardingStage.completed;
+      default:
+        return OnboardingStage.signedOut;
+    }
+  }
+}
+
+/// Which sign-in flow the screens belong to. Each has its own business
+/// logic (RegistrationFlow, LoginFlow, MpinResetFlow); only the code (OTP)
+/// step and the session are shared.
+///
+/// - register:  name -> mobile -> code -> create + confirm MPIN -> Home
+/// - login:     mobile -> code -> enter MPIN -> Home
+/// - resetMpin: mobile -> code -> new MPIN + confirm -> Login
+enum AuthFlow {
+  register,
+  login,
+  resetMpin;
+
+  /// The value sent to the backend as "purpose".
+  String get wireName => switch (this) {
+        AuthFlow.register => 'register',
+        AuthFlow.login => 'login',
+        AuthFlow.resetMpin => 'reset_mpin',
+      };
+
+  static const int registerSteps = 4;
+
+  /// "Step 2 of 4" on the Create Account screens, null otherwise.
+  String? stepLabel(OnboardingStage stage) {
+    if (this != AuthFlow.register) return null;
+    final n = switch (stage) {
+      OnboardingStage.signedOut => 1,
+      OnboardingStage.phoneEntry => 2,
+      OnboardingStage.otpVerify => 3,
+      OnboardingStage.mpinSetup || OnboardingStage.mpinConfirm => 4,
+      _ => null,
+    };
+    return n == null ? null : 'Step $n of $registerSteps';
   }
 }

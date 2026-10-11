@@ -1,7 +1,8 @@
 import '../models/benefit.dart';
 import 'api_client.dart';
 
-/// Benefits, announcements and discount violation reports.
+/// Benefits and announcements. (Store discount reports are Help & complaints
+/// requests, see RequestsRepository.)
 class BenefitsService {
   BenefitsService(this._api);
 
@@ -26,29 +27,5 @@ class BenefitsService {
         .toList();
     list.sort((a, b) => b.date.compareTo(a.date));
     return list;
-  }
-
-  /// Sends a report about a store that refused the senior discount.
-  /// Returns the reference number.
-  Future<String> reportViolation({
-    required String store,
-    required String location,
-    required DateTime date,
-    required String issue,
-    required String details,
-    required String reporterPhone,
-  }) async {
-    final result = await _api.post('/violations', {
-      'store': store,
-      'location': location,
-      'date': date.toIso8601String(),
-      'issue': issue,
-      'details': details,
-      'reporterPhone': reporterPhone,
-    });
-    if (result['ok'] != true) {
-      throw const ApiException('The report was not sent. Please try again.');
-    }
-    return result['reference'] as String? ?? ApiClient.newReference();
   }
 }

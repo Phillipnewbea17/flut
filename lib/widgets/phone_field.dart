@@ -94,19 +94,25 @@ class PhoneField extends StatelessWidget {
                     width: 116,
                     color: AppColors.primaryLight,
                     alignment: Alignment.center,
-                    child: Row(
-                      mainAxisSize: MainAxisSize.min,
-                      children: const [
-                        _PhilippineFlag(),
-                        SizedBox(width: 10),
-                        Text(
-                          '+63',
-                          style: TextStyle(
-                            fontSize: 20,
-                            color: AppColors.textPrimary,
+                    padding: const EdgeInsets.symmetric(horizontal: 6),
+                    // Shrinks a little with very big text instead of
+                    // spilling out of the box.
+                    child: FittedBox(
+                      fit: BoxFit.scaleDown,
+                      child: Row(
+                        mainAxisSize: MainAxisSize.min,
+                        children: const [
+                          _PhilippineFlag(),
+                          SizedBox(width: 10),
+                          Text(
+                            '+63',
+                            style: TextStyle(
+                              fontSize: 20,
+                              color: AppColors.textPrimary,
+                            ),
                           ),
-                        ),
-                      ],
+                        ],
+                      ),
                     ),
                   ),
                   Expanded(

@@ -6,7 +6,8 @@ plugins {
 
 android {
     namespace = "com.seniorcompanion.my_senior_app"
-    compileSdk = flutter.compileSdkVersion
+    // permission_handler_android needs 37 (compileSdk only; backward compatible).
+    compileSdk = 37
     ndkVersion = flutter.ndkVersion
 
     compileOptions {

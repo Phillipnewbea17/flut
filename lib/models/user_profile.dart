@@ -1,11 +1,44 @@
 import 'dart:convert';
 
+import 'osca_record.dart';
+
 enum UserRole { senior, familyRelative }
 
 extension UserRoleLabel on UserRole {
   String get label =>
       this == UserRole.senior ? 'Senior citizen' : 'Family relative';
 }
+
+/// Where the senior is with the Senior ID application. Drives the whole
+/// Personal information screen.
+enum UserApplicationStatus {
+  none,
+  submitted,
+  underReview,
+  needsAction,
+  approved,
+  rejected,
+}
+
+extension UserApplicationStatusInfo on UserApplicationStatus {
+  /// Words on the status chip; null for [UserApplicationStatus.none].
+  String? get label => switch (this) {
+        UserApplicationStatus.none => null,
+        UserApplicationStatus.submitted => 'Submitted',
+        UserApplicationStatus.underReview => 'Under review',
+        UserApplicationStatus.needsAction => 'Needs action',
+        UserApplicationStatus.approved => 'Approved',
+        UserApplicationStatus.rejected => 'Rejected',
+      };
+
+  static UserApplicationStatus parse(String? name) =>
+      UserApplicationStatus.values.firstWhere((s) => s.name == name,
+          orElse: () => UserApplicationStatus.none);
+}
+
+/// How the OSCA record came: from the app's application, or the user
+/// linked a record that already existed at the OSCA office.
+enum RecordSource { application, linked }
 
 class UserProfile {
   final String phone; // digits only, no country code, e.g. 9551402068
@@ -16,6 +49,30 @@ class UserProfile {
   final String municipality;
   final String province;
 
+  /// Purok / street of the current address.
+  final String street;
+
+  /// The name from Create Account (or the linked senior record). [fullName]
+  /// is these joined; older saved profiles only have [fullName].
+  final String firstName;
+  final String middleName;
+  final String lastName;
+  final String suffix;
+
+  /// "I have no middle name" was ticked.
+  final bool noMiddleName;
+
+  /// Set by "Link my record" (approved + linked). Otherwise the status comes
+  /// from the application (see UserProvider.applicationStatus).
+  final UserApplicationStatus applicationStatus;
+  final RecordSource? recordSource;
+
+  /// The OSCA record, once matched (Link my record).
+  final OscaRecord? oscaRecord;
+
+  /// The app-profile photo on this phone (not the Senior ID photo).
+  final String? photoPath;
+
   const UserProfile({
     required this.phone,
     required this.fullName,
@@ -24,7 +81,39 @@ class UserProfile {
     this.barangay = '',
     this.municipality = '',
     this.province = '',
+    this.street = '',
+    this.firstName = '',
+    this.middleName = '',
+    this.lastName = '',
+    this.suffix = '',
+    this.noMiddleName = false,
+    this.applicationStatus = UserApplicationStatus.none,
+    this.recordSource,
+    this.oscaRecord,
+    this.photoPath,
   });
+
+  /// True when the name was given in parts (First, Middle, Last, Suffix).
+  bool get hasNameParts =>
+      firstName.trim().isNotEmpty || lastName.trim().isNotEmpty;
+
+  /// "RM" for the avatar when there is no photo.
+  String get initials {
+    final words = (hasNameParts ? '$firstName $lastName' : fullName)
+        .trim()
+        .split(RegExp(r'\s+'))
+        .where((w) => w.isNotEmpty)
+        .toList();
+    if (words.isEmpty) return '';
+    final last = words.length > 1 ? words.last[0] : '';
+    return (words.first[0] + last).toUpperCase();
+  }
+
+  /// "Purok 3, Poblacion, Ubay, Bohol"
+  String get addressLine => [street, barangay, municipality, province]
+      .map((s) => s.trim())
+      .where((s) => s.isNotEmpty)
+      .join(', ');
 
   /// "+63 955 140 2068"
   String get displayPhone => formatPhone(phone);
@@ -69,6 +158,16 @@ class UserProfile {
     String? barangay,
     String? municipality,
     String? province,
+    String? street,
+    String? firstName,
+    String? middleName,
+    String? lastName,
+    String? suffix,
+    bool? noMiddleName,
+    UserApplicationStatus? applicationStatus,
+    RecordSource? recordSource,
+    OscaRecord? oscaRecord,
+    String? Function()? photoPath,
   }) {
     return UserProfile(
       phone: phone ?? this.phone,
@@ -78,6 +177,16 @@ class UserProfile {
       barangay: barangay ?? this.barangay,
       municipality: municipality ?? this.municipality,
       province: province ?? this.province,
+      street: street ?? this.street,
+      firstName: firstName ?? this.firstName,
+      middleName: middleName ?? this.middleName,
+      lastName: lastName ?? this.lastName,
+      suffix: suffix ?? this.suffix,
+      noMiddleName: noMiddleName ?? this.noMiddleName,
+      applicationStatus: applicationStatus ?? this.applicationStatus,
+      recordSource: recordSource ?? this.recordSource,
+      oscaRecord: oscaRecord ?? this.oscaRecord,
+      photoPath: photoPath != null ? photoPath() : this.photoPath,
     );
   }
 
@@ -89,9 +198,20 @@ class UserProfile {
         'barangay': barangay,
         'municipality': municipality,
         'province': province,
+        'street': street,
+        'firstName': firstName,
+        'middleName': middleName,
+        'lastName': lastName,
+        'suffix': suffix,
+        'noMiddleName': noMiddleName,
+        'applicationStatus': applicationStatus.name,
+        'recordSource': recordSource?.name,
+        'oscaRecord': oscaRecord?.toJson(),
+        'photoPath': photoPath,
       };
 
   factory UserProfile.fromJson(Map<String, dynamic> json) {
+    final record = json['oscaRecord'];
     return UserProfile(
       phone: json['phone'] as String? ?? '',
       fullName: json['fullName'] as String? ?? '',
@@ -103,6 +223,21 @@ class UserProfile {
       barangay: json['barangay'] as String? ?? '',
       municipality: json['municipality'] as String? ?? '',
       province: json['province'] as String? ?? '',
+      street: json['street'] as String? ?? '',
+      firstName: json['firstName'] as String? ?? '',
+      middleName: json['middleName'] as String? ?? '',
+      lastName: json['lastName'] as String? ?? '',
+      suffix: json['suffix'] as String? ?? '',
+      noMiddleName: json['noMiddleName'] as bool? ?? false,
+      applicationStatus: UserApplicationStatusInfo.parse(
+          json['applicationStatus'] as String?),
+      recordSource: RecordSource.values
+          .where((s) => s.name == json['recordSource'])
+          .firstOrNull,
+      oscaRecord: record is Map
+          ? OscaRecord.fromJson(Map<String, dynamic>.from(record))
+          : null,
+      photoPath: json['photoPath'] as String?,
     );
   }
 

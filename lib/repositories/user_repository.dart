@@ -56,6 +56,32 @@ class UserRepository extends ChangeNotifier {
     }
   }
 
+  /// Uploads the app-profile photo so staff see it in User Management.
+  /// Returns false when offline or the upload failed; the photo is still
+  /// kept on this phone by UserProvider.
+  Future<bool> uploadPhoto(Uint8List bytes) async {
+    try {
+      final result = await _api.postBytes(
+        '/profile/photo',
+        bytes: bytes,
+        filename: 'profile.jpg',
+      );
+      return result['ok'] == true;
+    } catch (_) {
+      return false;
+    }
+  }
+
+  /// Tells the server to drop the app-profile photo. Best effort.
+  Future<bool> removePhoto() async {
+    try {
+      final result = await _api.post('/profile/photo/remove', const {});
+      return result['ok'] == true;
+    } catch (_) {
+      return false;
+    }
+  }
+
   void reset() {
     _seniors = [];
     _loaded = false;

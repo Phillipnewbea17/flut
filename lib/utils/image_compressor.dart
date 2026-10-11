@@ -34,6 +34,14 @@ class ImageCompressor {
         camera: CameraDevice.front,
       );
 
+  /// App-profile picture (front camera). Not the Senior ID photo.
+  Future<Uint8List?> pickProfilePhoto(ImageSource source) => _pick(
+        source: source,
+        maxSide: photoMaxSide,
+        quality: photoQuality,
+        camera: CameraDevice.front,
+      );
+
   Future<Uint8List?> _pick({
     required ImageSource source,
     required double maxSide,

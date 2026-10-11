@@ -1,13 +1,13 @@
 import 'package:flutter/material.dart';
 import '../theme/app_colors.dart';
 
-/// White rounded card with soft shadow. Used for the login card, the
-/// application-status card and the announcement cards.
+/// White rounded card with a soft green shadow, floating on the mint page.
+/// Used for the login card, the announcement cards, menus and lists.
 class InfoCard extends StatelessWidget {
   final Widget child;
   final EdgeInsetsGeometry padding;
   final VoidCallback? onTap;
-  final bool outlined; // true = thin green outline (Quick action tiles)
+  final bool outlined; // true = flatter card for tiles and list rows
 
   const InfoCard({
     super.key,
@@ -19,20 +19,33 @@ class InfoCard extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
-    return Material(
-      color: AppColors.card,
-      elevation: outlined ? 0 : 6,
-      shadowColor: Colors.black26,
-      shape: RoundedRectangleBorder(
-        borderRadius: BorderRadius.circular(28),
-        side: outlined
-            ? const BorderSide(color: AppColors.primaryLight, width: 2)
-            : BorderSide.none,
+    final radius = BorderRadius.circular(outlined ? 22 : 26);
+    return DecoratedBox(
+      decoration: BoxDecoration(
+        borderRadius: radius,
+        boxShadow: outlined
+            ? const [
+                BoxShadow(
+                  color: Color(0x140C6E3D),
+                  blurRadius: 16,
+                  offset: Offset(0, 6),
+                ),
+              ]
+            : AppColors.cardShadow,
       ),
-      child: InkWell(
-        borderRadius: BorderRadius.circular(28),
-        onTap: onTap,
-        child: Padding(padding: padding, child: child),
+      child: Material(
+        color: AppColors.card,
+        shape: RoundedRectangleBorder(
+          borderRadius: radius,
+          side: outlined
+              ? const BorderSide(color: Color(0xFFEDF5F0), width: 1)
+              : BorderSide.none,
+        ),
+        clipBehavior: Clip.antiAlias,
+        child: InkWell(
+          onTap: onTap,
+          child: Padding(padding: padding, child: child),
+        ),
       ),
     );
   }

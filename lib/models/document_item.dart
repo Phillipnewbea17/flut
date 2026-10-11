@@ -98,3 +98,124 @@ class DocumentItem {
     );
   }
 }
+
+/// The OSCA office's decision on one paper (web Document Verification).
+enum DocumentReviewStatus { pending, approved, needsCorrection, rejected }
+
+/// One entry of the optional "documents" list in GET /application:
+///   {"type": "proofOfResidence", "status": "needsCorrection",
+///    "note": "The photo is blurred.", "reviewedAt": "2026-10-02T10:00:00"}
+class DocumentReview {
+  final DocumentType type;
+  final DocumentReviewStatus status;
+  final String note;
+  final DateTime? reviewedAt;
+
+  const DocumentReview({
+    required this.type,
+    required this.status,
+    this.note = '',
+    this.reviewedAt,
+  });
+
+  Map<String, dynamic> toJson() => {
+        'type': type.name,
+        'status': status.name,
+        'note': note,
+        'reviewedAt': reviewedAt?.toIso8601String(),
+      };
+
+  factory DocumentReview.fromJson(Map<String, dynamic> json) {
+    return DocumentReview(
+      type: DocumentTypeInfo.parse(json['type'] as String?),
+      status: DocumentReviewStatus.values.firstWhere(
+        (s) => s.name == json['status'],
+        orElse: () => DocumentReviewStatus.pending,
+      ),
+      note: json['note'] as String? ?? '',
+      reviewedAt: DateTime.tryParse(json['reviewedAt'] as String? ?? ''),
+    );
+  }
+}
+
+/// What the user sees for one paper, from the photo on the phone and the
+/// office's decision together.
+enum DocumentState {
+  notSubmitted,
+  sending,
+  notSent,
+
+  /// No backend address: kept on the phone, nothing was sent.
+  savedOnPhone,
+  submitted,
+  needsCorrection,
+  approved,
+  rejected,
+}
+
+extension DocumentStateInfo on DocumentState {
+  String get label {
+    switch (this) {
+      case DocumentState.notSubmitted:
+        return 'Not submitted';
+      case DocumentState.sending:
+        return 'Sending...';
+      case DocumentState.notSent:
+        return 'Not sent. Please send again.';
+      case DocumentState.savedOnPhone:
+        return 'Not sent: not connected to the OSCA office';
+      case DocumentState.submitted:
+        return 'Submitted';
+      case DocumentState.needsCorrection:
+        return 'Needs correction';
+      case DocumentState.approved:
+        return 'Approved';
+      case DocumentState.rejected:
+        return 'Rejected';
+    }
+  }
+
+  /// The user should take a new photo of this paper.
+  bool get needsNewPhoto =>
+      this == DocumentState.notSubmitted ||
+      this == DocumentState.needsCorrection ||
+      this == DocumentState.rejected;
+}
+
+/// Combines the newest photo of a paper ([item]) with the office's
+/// [review]. A photo taken after the review replaces the reviewed one, so it
+/// shows as "Submitted" (waiting for a new check) instead.
+DocumentState documentStateOf({
+  required DocumentItem? item,
+  required DocumentReview? review,
+  required bool applicationApproved,
+  required bool sendsToOffice,
+}) {
+  if (item == null) return DocumentState.notSubmitted;
+  switch (item.status) {
+    case DocumentStatus.uploading:
+      return DocumentState.sending;
+    case DocumentStatus.saved:
+    case DocumentStatus.failed:
+      return DocumentState.notSent;
+    case DocumentStatus.uploaded:
+      break;
+  }
+  if (!sendsToOffice) return DocumentState.savedOnPhone;
+
+  final reviewedAt = review?.reviewedAt;
+  final newerPhoto = reviewedAt != null && item.addedAt.isAfter(reviewedAt);
+  if (review != null && !newerPhoto) {
+    switch (review.status) {
+      case DocumentReviewStatus.approved:
+        return DocumentState.approved;
+      case DocumentReviewStatus.needsCorrection:
+        return DocumentState.needsCorrection;
+      case DocumentReviewStatus.rejected:
+        return DocumentState.rejected;
+      case DocumentReviewStatus.pending:
+        return DocumentState.submitted;
+    }
+  }
+  return applicationApproved ? DocumentState.approved : DocumentState.submitted;
+}

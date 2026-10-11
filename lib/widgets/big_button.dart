@@ -15,6 +15,10 @@ class BigButton extends StatelessWidget {
   final BigButtonStyle style;
   final Color? color;
 
+  /// Keep the label on one line: it shrinks a little instead of wrapping.
+  /// For buttons side by side, like Back and Next.
+  final bool singleLine;
+
   const BigButton({
     super.key,
     required this.label,
@@ -23,7 +27,24 @@ class BigButton extends StatelessWidget {
     this.trailingIcon = false,
     this.style = BigButtonStyle.filled,
     this.color,
+    this.singleLine = false,
   });
+
+  Widget _label(Color fg) {
+    final text = Text(
+      label.toUpperCase(),
+      textAlign: TextAlign.center,
+      maxLines: singleLine ? 1 : null,
+      softWrap: !singleLine,
+      style: TextStyle(
+        color: fg,
+        fontSize: 16,
+        fontWeight: FontWeight.w700,
+        letterSpacing: 0.5,
+      ),
+    );
+    return singleLine ? FittedBox(fit: BoxFit.scaleDown, child: text) : text;
+  }
 
   @override
   Widget build(BuildContext context) {
@@ -42,7 +63,7 @@ class BigButton extends StatelessWidget {
             : AppColors.primary;
 
     final iconWidget =
-        icon == null ? null : Icon(icon, color: fg, size: 28);
+        icon == null ? null : Icon(icon, color: fg, size: 24);
 
     return SizedBox(
       width: double.infinity,
@@ -58,7 +79,7 @@ class BigButton extends StatelessWidget {
           borderRadius: BorderRadius.circular(20),
           onTap: onPressed,
           child: ConstrainedBox(
-            constraints: const BoxConstraints(minHeight: 72),
+            constraints: const BoxConstraints(minHeight: 56),
             child: Padding(
               padding:
                   const EdgeInsets.symmetric(horizontal: 20, vertical: 12),
@@ -69,18 +90,7 @@ class BigButton extends StatelessWidget {
                     iconWidget,
                     const SizedBox(width: 12),
                   ],
-                  Flexible(
-                    child: Text(
-                      label.toUpperCase(),
-                      textAlign: TextAlign.center,
-                      style: TextStyle(
-                        color: fg,
-                        fontSize: 18,
-                        fontWeight: FontWeight.w700,
-                        letterSpacing: 0.5,
-                      ),
-                    ),
-                  ),
+                  Flexible(child: _label(fg)),
                   if (iconWidget != null && trailingIcon) ...[
                     const SizedBox(width: 12),
                     iconWidget,

@@ -2,9 +2,11 @@ import 'package:flutter/material.dart';
 import 'package:provider/provider.dart';
 import 'package:qr_flutter/qr_flutter.dart';
 
+import '../../models/senior_id.dart';
 import '../../repositories/wallet_repository.dart';
 import '../../theme/app_colors.dart';
 import '../../theme/app_theme.dart';
+import '../../widgets/section_title.dart';
 
 /// Big QR code and ID number to show the cashier.
 class QrCashierView extends StatelessWidget {
@@ -16,7 +18,7 @@ class QrCashierView extends StatelessWidget {
 
     return Scaffold(
       backgroundColor: Colors.white,
-      appBar: AppTheme.appBar('Show to cashier'),
+      appBar: AppTheme.appBar('QR code'),
       body: SafeArea(
         child: id == null
             ? const Center(
@@ -33,6 +35,16 @@ class QrCashierView extends StatelessWidget {
             : ListView(
                 padding: const EdgeInsets.all(24),
                 children: [
+                  if (!id.isActive) ...[
+                    NoticeCard(
+                      icon: Icons.warning_amber_outlined,
+                      color: AppColors.danger,
+                      title: 'This ID is ${id.status.label.toLowerCase()}',
+                      text: 'It may not be accepted. Please contact the OSCA '
+                          'office.',
+                    ),
+                    const SizedBox(height: 20),
+                  ],
                   const Text(
                     'Please scan or check my Senior Citizen ID.',
                     textAlign: TextAlign.center,

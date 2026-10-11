@@ -38,24 +38,24 @@ class AppTheme {
       scaffoldBackgroundColor: background,
       textTheme: TextTheme(
         headlineMedium: const TextStyle(
-          fontSize: 30,
+          fontSize: 26,
           fontWeight: FontWeight.w700,
           color: AppColors.textOnPrimary,
         ),
         titleLarge: TextStyle(
-          fontSize: 24,
+          fontSize: 20,
           fontWeight: FontWeight.w700,
           color: text,
         ),
         titleMedium: TextStyle(
-          fontSize: 18,
+          fontSize: 16,
           fontWeight: FontWeight.w700,
           color: text,
         ),
-        bodyLarge: TextStyle(fontSize: 18, color: text),
-        bodyMedium: TextStyle(fontSize: 16, color: secondaryText, height: 1.4),
+        bodyLarge: TextStyle(fontSize: 16, color: text),
+        bodyMedium: TextStyle(fontSize: 14, color: secondaryText, height: 1.4),
         labelLarge: const TextStyle(
-          fontSize: 17,
+          fontSize: 15,
           fontWeight: FontWeight.w700,
           letterSpacing: 0.5,
         ),
@@ -64,7 +64,7 @@ class AppTheme {
         filled: true,
         fillColor: Colors.white,
         contentPadding: const EdgeInsets.symmetric(horizontal: 16, vertical: 18),
-        hintStyle: const TextStyle(color: Color(0xFF8A9A92), fontSize: 18),
+        hintStyle: const TextStyle(color: Color(0xFF8A9A92), fontSize: 16),
         enabledBorder: outline(border, borderWidth),
         disabledBorder: outline(AppColors.border, borderWidth),
         focusedBorder: outline(focus, borderWidth + 1.5),
@@ -107,15 +107,15 @@ class AppTheme {
       backgroundColor: AppColors.primary,
       foregroundColor: Colors.white,
       surfaceTintColor: Colors.transparent,
-      toolbarHeight: 68,
+      toolbarHeight: 60,
       titleSpacing: 4,
       titleTextStyle: const TextStyle(
         fontFamily: fontFamily,
-        fontSize: 22,
+        fontSize: 20,
         fontWeight: FontWeight.w700,
         color: Colors.white,
       ),
-      iconTheme: const IconThemeData(color: Colors.white, size: 28),
+      iconTheme: const IconThemeData(color: Colors.white, size: 24),
     );
   }
 }

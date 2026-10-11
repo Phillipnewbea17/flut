@@ -8,21 +8,23 @@ import '../../../app_state/accessibility_provider.dart';
 import '../../../app_state/user_provider.dart';
 import '../../../models/application_status.dart';
 import '../../../models/benefit.dart';
+import '../../../models/user_profile.dart';
 import '../../../repositories/application_repository.dart';
 import '../../../routes/app_router.dart';
 import '../../../services/benefits_service.dart';
 import '../../../theme/app_colors.dart';
-import '../../../widgets/big_button.dart';
+import '../../../widgets/announcement_card.dart';
 import '../../../widgets/info_card.dart';
-import '../../../widgets/onboarding_scaffold.dart';
-import '../../../widgets/status_stepper.dart';
+import '../../../widgets/profile_avatar.dart';
+import '../../../widgets/section_title.dart';
+import '../../../widgets/status_pill.dart';
 
-/// Home tab: greeting, application status, quick actions, announcements.
+/// Home tab. Answers, from top to bottom:
+///   1. What is happening with my application?  (Application Status)
+///   2. What can I do now?                      (Quick actions)
+///   3. What does the OSCA office want me to know? (Latest announcement)
 class HomeDashboardView extends StatefulWidget {
-  /// Opens the Account tab (the round avatar in the header).
-  final VoidCallback onOpenAccount;
-
-  const HomeDashboardView({super.key, required this.onOpenAccount});
+  const HomeDashboardView({super.key});
 
   @override
   State<HomeDashboardView> createState() => _HomeDashboardViewState();
@@ -48,16 +50,26 @@ class _HomeDashboardViewState extends State<HomeDashboardView> {
     ]);
   }
 
+  String _greeting(BuildContext context, String firstName) {
+    if (firstName.isEmpty) return 'Mabuhay!';
+    final hour = DateTime.now().hour;
+    final key = hour < 12
+        ? 'homeGoodMorning'
+        : hour < 18
+            ? 'homeGoodAfternoon'
+            : 'homeGoodEvening';
+    return context.tr(key, {'name': firstName});
+  }
+
   @override
   Widget build(BuildContext context) {
     final user = context.watch<UserProvider>();
     final applications = context.watch<ApplicationRepository>();
     final topInset = MediaQuery.paddingOf(context).top;
     final profile = user.profile;
-    final firstName = user.firstName;
 
     return AnnotatedRegion<SystemUiOverlayStyle>(
-      value: SystemUiOverlayStyle.light.copyWith(
+      value: SystemUiOverlayStyle.dark.copyWith(
         statusBarColor: Colors.transparent,
       ),
       child: RefreshIndicator(
@@ -68,80 +80,68 @@ class _HomeDashboardViewState extends State<HomeDashboardView> {
           child: Column(
             crossAxisAlignment: CrossAxisAlignment.stretch,
             children: [
-              GreenHeaderStack(
-                overlap: 96,
-                header: Padding(
-                  padding: EdgeInsets.fromLTRB(24, topInset + 12, 20, 24),
-                  child: Column(
-                    crossAxisAlignment: CrossAxisAlignment.start,
-                    children: [
-                      Row(
-                        children: [
-                          Expanded(
-                            child: _LocationButton(
-                              text: (profile?.hasAddress ?? false)
-                                  ? profile!.shortAddress
-                                  : context.tr('homeAddAddress'),
-                              onTap: () => context.push(Routes.address),
-                            ),
-                          ),
-                          _BellButton(
-                            unread: applications.unreadCount,
-                            onTap: () => context.push(Routes.notifications),
-                          ),
-                        ],
-                      ),
-                      const SizedBox(height: 20),
-                      Row(
-                        children: [
-                          Expanded(
-                            child: Column(
-                              crossAxisAlignment: CrossAxisAlignment.start,
-                              children: [
-                                Semantics(
-                                  header: true,
-                                  child: Text(
-                                    firstName.isEmpty
-                                        ? 'Mabuhay!'
-                                        : context.tr(
-                                      'homeGreeting',
-                                      {'name': firstName},
-                                    ),
-                                    style: const TextStyle(
-                                      color: Colors.white,
-                                      fontSize: 32,
-                                      fontWeight: FontWeight.w700,
-                                      height: 1.15,
-                                    ),
-                                  ),
+              // A. HEADER: avatar, greeting, bell, then the address chip
+              Padding(
+                padding: EdgeInsets.fromLTRB(20, topInset + 12, 20, 0),
+                child: Column(
+                  crossAxisAlignment: CrossAxisAlignment.start,
+                  children: [
+                    Row(
+                      children: [
+                        _AvatarButton(
+                          profile: profile,
+                          onTap: () => context.go(Routes.account),
+                        ),
+                        const SizedBox(width: 14),
+                        Expanded(
+                          child: Column(
+                            crossAxisAlignment: CrossAxisAlignment.start,
+                            children: [
+                              Text(
+                                DateFormat('EEEE, MMMM d')
+                                    .format(DateTime.now()),
+                                style: const TextStyle(
+                                  color: AppColors.textSecondary,
+                                  fontSize: 14,
                                 ),
-                                const SizedBox(height: 6),
-                                Text(
-                                  DateFormat('EEE, MMM d, y')
-                                      .format(DateTime.now()),
+                              ),
+                              Semantics(
+                                header: true,
+                                child: Text(
+                                  _greeting(context, user.firstName),
                                   style: const TextStyle(
-                                    color: Colors.white,
-                                    fontSize: 19,
+                                    color: AppColors.textPrimary,
+                                    fontSize: 21,
+                                    fontWeight: FontWeight.w700,
+                                    height: 1.15,
                                   ),
                                 ),
-                              ],
-                            ),
+                              ),
+                            ],
                           ),
-                          const SizedBox(width: 12),
-                          _AvatarButton(onTap: widget.onOpenAccount),
-                        ],
-                      ),
-                    ],
-                  ),
+                        ),
+                        const SizedBox(width: 12),
+                        _BellButton(
+                          unread: applications.unreadCount,
+                          onTap: () => context.push(Routes.notifications),
+                        ),
+                      ],
+                    ),
+                    const SizedBox(height: 12),
+                    _LocationButton(
+                      text: (profile?.hasAddress ?? false)
+                          ? profile!.shortAddress
+                          : context.tr('homeAddAddress'),
+                      onTap: () => context.push(Routes.address),
+                    ),
+                  ],
                 ),
-                card: Padding(
-                  padding: const EdgeInsets.symmetric(horizontal: 20),
-                  child: _ApplicationCard(
-                    status: applications.status,
-                    onViewProgress: () => context.push(Routes.progress),
-                    onStart: () => context.push(Routes.upload),
-                  ),
-                ),
+              ),
+
+              // B. APPLICATION STATUS (green hero card)
+              Padding(
+                padding: const EdgeInsets.fromLTRB(20, 16, 20, 0),
+                child: _ApplicationStatusCard(status: applications.status),
               ),
               if (applications.error != null)
                 Padding(
@@ -155,7 +155,7 @@ class _HomeDashboardViewState extends State<HomeDashboardView> {
                         child: Text(
                           applications.error!,
                           style: const TextStyle(
-                            fontSize: 16,
+                            fontSize: 15,
                             color: AppColors.textSecondary,
                           ),
                         ),
@@ -163,48 +163,54 @@ class _HomeDashboardViewState extends State<HomeDashboardView> {
                     ],
                   ),
                 ),
+
+              // C. QUICK ACTIONS
               Padding(
                 padding: const EdgeInsets.fromLTRB(20, 28, 20, 0),
                 child: Column(
                   crossAxisAlignment: CrossAxisAlignment.stretch,
                   children: [
-                    _SectionTitle(context.tr('homeQuickActions')),
+                    SectionTitle(context.tr('homeQuickActions'), fontSize: 20),
                     const SizedBox(height: 16),
                     _TileRow(
                       left: _QuickTile(
-                        icon: Icons.calculate_outlined,
-                        title: context.tr('tileCalculator'),
-                        subtitle: context.tr('tileCalculatorSub'),
-                        onTap: () => context.push(Routes.calculator),
-                      ),
-                      right: _QuickTile(
                         icon: Icons.upload_file_outlined,
                         title: context.tr('tileUpload'),
                         subtitle: context.tr('tileUploadSub'),
+                        highlight: true,
                         onTap: () => context.push(Routes.upload),
+                      ),
+                      right: _QuickTile(
+                        icon: Icons.volunteer_activism_outlined,
+                        title: context.tr('tileAssistance'),
+                        subtitle: context.tr('tileAssistanceSub'),
+                        onTap: () => context.push(Routes.assistance),
                       ),
                     ),
                     const SizedBox(height: 14),
                     _TileRow(
                       left: _QuickTile(
-                        icon: Icons.group_outlined,
-                        title: context.tr('tileFamily'),
-                        subtitle: context.tr('tileFamilySub'),
-                        onTap: () => context.push(Routes.family),
+                        icon: Icons.forum_outlined,
+                        title: context.tr('tileHelp'),
+                        subtitle: context.tr('tileHelpSub'),
+                        onTap: () => context.push(Routes.help),
                       ),
                       right: _QuickTile(
-                        icon: Icons.favorite_outline,
-                        title: context.tr('tileBenefits'),
-                        subtitle: context.tr('tileBenefitsSub'),
-                        onTap: () => context.push(Routes.benefits),
+                        icon: Icons.badge_outlined,
+                        title: context.tr('tileIdServices'),
+                        subtitle: context.tr('tileIdServicesSub'),
+                        onTap: () => context.push(Routes.idServices),
                       ),
                     ),
+
+                    // D. LATEST ANNOUNCEMENT
                     const SizedBox(height: 32),
                     Row(
                       children: [
                         Expanded(
-                          child: _SectionTitle(
-                            context.tr('homeLatestAnnouncements'),
+                          child: SectionTitle(
+                            context.tr('homeLatestAnnouncement'),
+                            fontSize: 20,
                           ),
                         ),
                         TextButton(
@@ -212,62 +218,28 @@ class _HomeDashboardViewState extends State<HomeDashboardView> {
                           style: TextButton.styleFrom(
                             minimumSize: const Size(48, 48),
                           ),
-                          child: Text(
-                            context.tr('homeViewAll'),
-                            style: const TextStyle(
-                              fontSize: 19,
-                              fontWeight: FontWeight.w700,
-                              color: AppColors.primary,
-                            ),
+                          child: Row(
+                            mainAxisSize: MainAxisSize.min,
+                            children: [
+                              Text(
+                                context.tr('homeViewAll'),
+                                style: const TextStyle(
+                                  fontSize: 15,
+                                  fontWeight: FontWeight.w700,
+                                  color: AppColors.primary,
+                                ),
+                              ),
+                              const Icon(Icons.chevron_right,
+                                  color: AppColors.primary, size: 22),
+                            ],
                           ),
                         ),
                       ],
                     ),
                     const SizedBox(height: 12),
+                    _LatestAnnouncements(future: _announcements),
                   ],
                 ),
-              ),
-              FutureBuilder<List<Announcement>>(
-                future: _announcements,
-                builder: (context, snapshot) {
-                  if (snapshot.connectionState != ConnectionState.done) {
-                    return const Padding(
-                      padding: EdgeInsets.all(24),
-                      child: Center(child: CircularProgressIndicator()),
-                    );
-                  }
-                  final items = snapshot.data ?? const <Announcement>[];
-                  if (snapshot.hasError || items.isEmpty) {
-                    return const Padding(
-                      padding: EdgeInsets.symmetric(horizontal: 24),
-                      child: Text(
-                        'No announcements right now. Pull down to refresh.',
-                        style: TextStyle(
-                          fontSize: 17,
-                          color: AppColors.textSecondary,
-                        ),
-                      ),
-                    );
-                  }
-                  return SingleChildScrollView(
-                    scrollDirection: Axis.horizontal,
-                    padding: const EdgeInsets.symmetric(horizontal: 20),
-                    child: IntrinsicHeight(
-                      child: Row(
-                        crossAxisAlignment: CrossAxisAlignment.stretch,
-                        children: [
-                          for (final item in items.take(5)) ...[
-                            AnnouncementCard(
-                              announcement: item,
-                              onTap: () => context.push(Routes.announcements),
-                            ),
-                            const SizedBox(width: 14),
-                          ],
-                        ],
-                      ),
-                    ),
-                  );
-                },
               ),
             ],
           ),
@@ -277,6 +249,7 @@ class _HomeDashboardViewState extends State<HomeDashboardView> {
   }
 }
 
+/// The senior's address as a white chip under the greeting.
 class _LocationButton extends StatelessWidget {
   final String text;
   final VoidCallback onTap;
@@ -285,31 +258,35 @@ class _LocationButton extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
-    return Align(
-      alignment: Alignment.centerLeft,
+    return Material(
+      color: Colors.white,
+      borderRadius: BorderRadius.circular(24),
       child: InkWell(
         onTap: onTap,
-        borderRadius: BorderRadius.circular(12),
-        child: Padding(
-          padding: const EdgeInsets.symmetric(vertical: 10, horizontal: 2),
-          child: Row(
-            mainAxisSize: MainAxisSize.min,
-            children: [
-              const Icon(Icons.location_on_outlined,
-                  color: Colors.white, size: 26),
-              const SizedBox(width: 8),
-              Flexible(
-                child: Text(
-                  text,
-                  overflow: TextOverflow.ellipsis,
-                  style: const TextStyle(
-                    color: Colors.white,
-                    fontSize: 19,
-                    fontWeight: FontWeight.w700,
+        borderRadius: BorderRadius.circular(24),
+        child: ConstrainedBox(
+          constraints: const BoxConstraints(minHeight: 40),
+          child: Padding(
+            padding: const EdgeInsets.symmetric(vertical: 10, horizontal: 14),
+            child: Row(
+              mainAxisSize: MainAxisSize.min,
+              children: [
+                const Icon(Icons.location_on_outlined,
+                    color: AppColors.primary, size: 18),
+                const SizedBox(width: 6),
+                Flexible(
+                  child: Text(
+                    text,
+                    overflow: TextOverflow.ellipsis,
+                    style: const TextStyle(
+                      color: AppColors.primary,
+                      fontSize: 14,
+                      fontWeight: FontWeight.w700,
+                    ),
                   ),
                 ),
-              ),
-            ],
+              ],
+            ),
           ),
         ),
       ),
@@ -317,6 +294,7 @@ class _LocationButton extends StatelessWidget {
   }
 }
 
+/// Bell with the number of unread messages, on a white rounded square.
 class _BellButton extends StatelessWidget {
   final int unread;
   final VoidCallback onTap;
@@ -327,38 +305,54 @@ class _BellButton extends StatelessWidget {
   Widget build(BuildContext context) {
     return Semantics(
       button: true,
-      label: unread == 0
-          ? 'Notifications'
-          : 'Notifications, $unread new',
-      child: Material(
-        color: const Color(0x33FFFFFF),
-        shape: const CircleBorder(),
-        child: InkWell(
-          customBorder: const CircleBorder(),
-          onTap: onTap,
-          child: SizedBox(
-            width: 60,
-            height: 60,
-            child: Stack(
-              alignment: Alignment.center,
-              children: [
-                const Icon(Icons.notifications_none,
-                    color: Colors.white, size: 32),
-                if (unread > 0)
-                  Positioned(
-                    top: 12,
-                    right: 13,
-                    child: Container(
-                      width: 14,
-                      height: 14,
-                      decoration: BoxDecoration(
-                        color: Colors.white,
-                        shape: BoxShape.circle,
-                        border: Border.all(color: AppColors.primary, width: 2),
+      label: unread == 0 ? 'Notifications' : 'Notifications, $unread new',
+      excludeSemantics: true,
+      child: DecoratedBox(
+        decoration: BoxDecoration(
+          borderRadius: BorderRadius.circular(20),
+          boxShadow: AppColors.cardShadow,
+        ),
+        child: Material(
+          color: Colors.white,
+          borderRadius: BorderRadius.circular(20),
+          child: InkWell(
+            borderRadius: BorderRadius.circular(20),
+            onTap: onTap,
+            child: SizedBox(
+              width: 48,
+              height: 48,
+              child: Stack(
+                clipBehavior: Clip.none,
+                alignment: Alignment.center,
+                children: [
+                  const Icon(Icons.notifications_none,
+                      color: AppColors.textPrimary, size: 24),
+                  if (unread > 0)
+                    Positioned(
+                      top: 4,
+                      right: 2,
+                      child: Container(
+                        constraints:
+                            const BoxConstraints(minWidth: 20, minHeight: 20),
+                        padding: const EdgeInsets.symmetric(horizontal: 6),
+                        alignment: Alignment.center,
+                        decoration: BoxDecoration(
+                          color: AppColors.danger,
+                          borderRadius: BorderRadius.circular(12),
+                          border: Border.all(color: Colors.white, width: 2),
+                        ),
+                        child: Text(
+                          unread > 9 ? '9+' : '$unread',
+                          style: const TextStyle(
+                            color: Colors.white,
+                            fontSize: 11,
+                            fontWeight: FontWeight.w700,
+                          ),
+                        ),
                       ),
                     ),
-                  ),
-              ],
+                ],
+              ),
             ),
           ),
         ),
@@ -367,29 +361,41 @@ class _BellButton extends StatelessWidget {
   }
 }
 
+/// The profile photo once the senior has set one (Personal information),
+/// otherwise a person icon.
 class _AvatarButton extends StatelessWidget {
+  final UserProfile? profile;
   final VoidCallback onTap;
 
-  const _AvatarButton({required this.onTap});
+  const _AvatarButton({required this.profile, required this.onTap});
 
   @override
   Widget build(BuildContext context) {
     return Semantics(
       button: true,
       label: 'Open my account',
-      child: Material(
-        color: AppColors.primaryLight,
-        shape: const CircleBorder(
-          side: BorderSide(color: Colors.white, width: 4),
+      child: DecoratedBox(
+        decoration: const BoxDecoration(
+          shape: BoxShape.circle,
+          boxShadow: AppColors.cardShadow,
         ),
-        child: InkWell(
-          customBorder: const CircleBorder(),
-          onTap: onTap,
-          child: const SizedBox(
-            width: 84,
-            height: 84,
-            child: Icon(Icons.person_outline,
-                color: AppColors.primary, size: 42),
+        child: Material(
+          color: Colors.white,
+          shape: const CircleBorder(),
+          child: InkWell(
+            customBorder: const CircleBorder(),
+            onTap: onTap,
+            child: SizedBox(
+              width: 52,
+              height: 52,
+              child: profile?.photoPath == null
+                  ? const Icon(Icons.person_outline,
+                      color: AppColors.primary, size: 28)
+                  : Padding(
+                      padding: const EdgeInsets.all(2),
+                      child: ProfileAvatar(profile: profile, radius: 24),
+                    ),
+            ),
           ),
         ),
       ),
@@ -397,159 +403,249 @@ class _AvatarButton extends StatelessWidget {
   }
 }
 
-class _ApplicationCard extends StatelessWidget {
+/// A short summary of the application on the green hero card, with one
+/// clear button. The full details (steps, history, papers) are on the
+/// Application Status page.
+class _ApplicationStatusCard extends StatelessWidget {
   final ApplicationStatus status;
-  final VoidCallback onViewProgress;
 
-  /// Opens Upload documents (shown while the application is not sent yet).
-  final VoidCallback onStart;
-
-  const _ApplicationCard({
-    required this.status,
-    required this.onViewProgress,
-    required this.onStart,
-  });
+  const _ApplicationStatusCard({required this.status});
 
   @override
   Widget build(BuildContext context) {
-    final dotColor = switch (status.stage) {
-      ApplicationStage.notStarted => AppColors.textSecondary,
-      ApplicationStage.needsAction => AppColors.warning,
-      _ => AppColors.success,
-    };
+    final stage = status.stage;
+    final updatedAt = status.updatedAt;
 
-    return InfoCard(
-      padding: const EdgeInsets.fromLTRB(22, 14, 10, 22),
-      child: Column(
-        crossAxisAlignment: CrossAxisAlignment.start,
-        children: [
-          // Row 1: small label on the left, "View progress >" on the right.
-          Row(
-            children: [
-              Expanded(
-                child: Text(
-                  context.tr('homeYourApplication'),
-                  maxLines: 1,
-                  overflow: TextOverflow.ellipsis,
-                  style: const TextStyle(
-                    fontSize: 18,
-                    color: AppColors.textSecondary,
-                  ),
-                ),
-              ),
-              _ViewProgressLink(onTap: onViewProgress),
-            ],
+    final String buttonLabel;
+    final IconData buttonIcon;
+    final String route;
+    switch (stage) {
+      case ApplicationStage.notStarted:
+      case ApplicationStage.cancelled:
+        buttonLabel = 'Start application';
+        buttonIcon = Icons.upload_file_outlined;
+        route = Routes.upload;
+      case ApplicationStage.needsAction:
+        buttonLabel = 'View what needs fixing';
+        buttonIcon = Icons.build_outlined;
+        route = Routes.applicationStatus;
+      case ApplicationStage.approved:
+      case ApplicationStage.rejected:
+        buttonLabel = 'View details';
+        buttonIcon = Icons.chevron_right;
+        route = Routes.applicationStatus;
+      case ApplicationStage.submitted:
+      case ApplicationStage.review:
+        buttonLabel = 'View status';
+        buttonIcon = Icons.chevron_right;
+        route = Routes.applicationStatus;
+    }
+
+    return Container(
+      clipBehavior: Clip.antiAlias,
+      decoration: BoxDecoration(
+        gradient: AppColors.heroGradient,
+        borderRadius: BorderRadius.circular(28),
+        boxShadow: const [
+          BoxShadow(
+            color: Color(0x660C6E3D),
+            blurRadius: 28,
+            offset: Offset(0, 14),
           ),
-          const SizedBox(height: 2),
-
-          // Row 2: the status gets the full width, on one line, so a word
-          // like "Submitted" is never split. Long translations shrink a
-          // little instead of wrapping.
+        ],
+      ),
+      child: Stack(
+        children: [
+          // Soft rings in the corner, like the mockup.
+          Positioned(
+            right: -70,
+            top: -80,
+            child: Container(
+              width: 200,
+              height: 200,
+              decoration: BoxDecoration(
+                shape: BoxShape.circle,
+                border: Border.all(color: const Color(0x12FFFFFF), width: 28),
+              ),
+            ),
+          ),
+          Positioned(
+            right: 40,
+            bottom: -60,
+            child: Container(
+              width: 120,
+              height: 120,
+              decoration: const BoxDecoration(
+                shape: BoxShape.circle,
+                color: Color(0x0FFFFFFF),
+              ),
+            ),
+          ),
           Padding(
-            padding: const EdgeInsets.only(right: 12),
-            child: Row(
+            padding: const EdgeInsets.fromLTRB(22, 20, 22, 22),
+            child: Column(
+              crossAxisAlignment: CrossAxisAlignment.stretch,
               children: [
-                Container(
-                  width: 14,
-                  height: 14,
-                  decoration: BoxDecoration(
-                    color: dotColor,
-                    shape: BoxShape.circle,
-                  ),
-                ),
-                const SizedBox(width: 12),
-                Expanded(
-                  child: FittedBox(
-                    fit: BoxFit.scaleDown,
-                    alignment: Alignment.centerLeft,
-                    child: Text(
-                      context.tr(status.stage.labelKey),
-                      maxLines: 1,
-                      softWrap: false,
-                      style: const TextStyle(
-                        fontSize: 28,
-                        fontWeight: FontWeight.w700,
-                        color: AppColors.textPrimary,
-                        height: 1.2,
-                      ),
+                Semantics(
+                  header: true,
+                  child: Text(
+                    stage.wasSent && status.applicationNo.isNotEmpty
+                        ? '${context.tr('homeApplicationStatus')} · '
+                            '#${status.applicationNo}'
+                        : context.tr('homeApplicationStatus'),
+                    style: const TextStyle(
+                      color: Color(0xE6FFFFFF),
+                      fontSize: 13,
+                      fontWeight: FontWeight.w700,
+                      letterSpacing: 0.4,
                     ),
                   ),
+                ),
+                const SizedBox(height: 10),
+                if (!stage.wasSent) ...[
+                  Text(
+                    stage == ApplicationStage.cancelled
+                        ? 'Your application was cancelled. You can start again any time.'
+                        : 'You have not submitted an application yet.',
+                    style: const TextStyle(
+                      fontSize: 20,
+                      fontWeight: FontWeight.w700,
+                      color: Colors.white,
+                      height: 1.3,
+                    ),
+                  ),
+                  const SizedBox(height: 8),
+                  const Text(
+                    'Send photos of your papers to apply for your Senior Citizen ID.',
+                    style: TextStyle(
+                      fontSize: 15,
+                      color: Color(0xE6FFFFFF),
+                      height: 1.4,
+                    ),
+                  ),
+                ] else ...[
+                  Align(
+                    alignment: Alignment.centerLeft,
+                    child: _HeroChip(
+                      look: StatusLook.application(context, stage),
+                    ),
+                  ),
+                  const SizedBox(height: 14),
+                  Text(
+                    status.message,
+                    style: const TextStyle(
+                      fontSize: 18,
+                      fontWeight: FontWeight.w600,
+                      color: Colors.white,
+                      height: 1.4,
+                    ),
+                  ),
+                  if (updatedAt != null) ...[
+                    const SizedBox(height: 10),
+                    Text(
+                      'Last update: ${DateFormat('MMMM d, y, h:mm a').format(updatedAt)}',
+                      style: const TextStyle(
+                        fontSize: 13,
+                        color: Color(0xD9FFFFFF),
+                      ),
+                    ),
+                  ],
+                ],
+                const SizedBox(height: 18),
+                _HeroButton(
+                  label: buttonLabel,
+                  icon: buttonIcon,
+                  trailingIcon: buttonIcon == Icons.chevron_right,
+                  onPressed: () => context.push(route),
                 ),
               ],
             ),
           ),
-          const SizedBox(height: 22),
-          Padding(
-            padding: const EdgeInsets.only(right: 12),
-            child: StatusStepper(stage: status.stage),
-          ),
-          const SizedBox(height: 18),
-          Padding(
-            padding: const EdgeInsets.only(right: 12),
-            child: Text(
-              status.message,
-              style: const TextStyle(
-                fontSize: 18,
-                color: AppColors.textSecondary,
-                height: 1.4,
-              ),
-            ),
-          ),
-          if (status.stage.canSubmit) ...[
-            const SizedBox(height: 18),
-            Padding(
-              padding: const EdgeInsets.only(right: 12),
-              child: BigButton(
-                label: status.stage == ApplicationStage.notStarted
-                    ? 'Start my application'
-                    : 'Fix my papers',
-                icon: Icons.upload_file_outlined,
-                onPressed: onStart,
-              ),
-            ),
-          ],
         ],
       ),
     );
   }
 }
 
-/// "View progress >" in one line, pushed to the right edge of the card.
-class _ViewProgressLink extends StatelessWidget {
-  final VoidCallback onTap;
+/// The status ("Being checked", "Approved"...) as a see-through chip on
+/// the green hero card. Icon and words, never color alone.
+class _HeroChip extends StatelessWidget {
+  final StatusLook look;
 
-  const _ViewProgressLink({required this.onTap});
+  const _HeroChip({required this.look});
 
   @override
   Widget build(BuildContext context) {
-    return Semantics(
-      button: true,
+    return Container(
+      padding: const EdgeInsets.symmetric(horizontal: 14, vertical: 8),
+      decoration: BoxDecoration(
+        color: const Color(0x2EFFFFFF),
+        borderRadius: BorderRadius.circular(24),
+      ),
+      child: Row(
+        mainAxisSize: MainAxisSize.min,
+        children: [
+          Icon(look.icon, color: Colors.white, size: 18),
+          const SizedBox(width: 8),
+          Flexible(
+            child: Text(
+              look.label,
+              style: const TextStyle(
+                color: Colors.white,
+                fontSize: 14,
+                fontWeight: FontWeight.w700,
+              ),
+            ),
+          ),
+        ],
+      ),
+    );
+  }
+}
+
+/// White button with green words, for the green hero card.
+class _HeroButton extends StatelessWidget {
+  final String label;
+  final IconData icon;
+  final bool trailingIcon;
+  final VoidCallback onPressed;
+
+  const _HeroButton({
+    required this.label,
+    required this.icon,
+    required this.trailingIcon,
+    required this.onPressed,
+  });
+
+  @override
+  Widget build(BuildContext context) {
+    final iconWidget = Icon(icon, color: AppColors.primary, size: 22);
+    return Material(
+      color: Colors.white,
+      borderRadius: BorderRadius.circular(20),
       child: InkWell(
-        onTap: onTap,
-        borderRadius: BorderRadius.circular(12),
+        borderRadius: BorderRadius.circular(20),
+        onTap: onPressed,
         child: ConstrainedBox(
-          // At least 48 x 48 so it is easy to tap.
-          constraints: const BoxConstraints(minHeight: 48, minWidth: 48),
+          constraints: const BoxConstraints(minHeight: 52),
           child: Padding(
-            padding: const EdgeInsets.only(left: 8, right: 2),
+            padding: const EdgeInsets.symmetric(horizontal: 20, vertical: 12),
             child: Row(
-              mainAxisSize: MainAxisSize.min,
+              mainAxisAlignment: MainAxisAlignment.center,
               children: [
-                Text(
-                  context.tr('homeViewProgress'),
-                  maxLines: 1,
-                  softWrap: false,
-                  style: const TextStyle(
-                    fontSize: 17,
-                    fontWeight: FontWeight.w700,
-                    color: AppColors.primary,
+                if (!trailingIcon) ...[iconWidget, const SizedBox(width: 10)],
+                Flexible(
+                  child: Text(
+                    label,
+                    textAlign: TextAlign.center,
+                    style: const TextStyle(
+                      color: AppColors.primary,
+                      fontSize: 16,
+                      fontWeight: FontWeight.w700,
+                    ),
                   ),
                 ),
-                const Icon(
-                  Icons.chevron_right,
-                  color: AppColors.primary,
-                  size: 26,
-                ),
+                if (trailingIcon) ...[const SizedBox(width: 6), iconWidget],
               ],
             ),
           ),
@@ -559,22 +655,45 @@ class _ViewProgressLink extends StatelessWidget {
   }
 }
 
-class _SectionTitle extends StatelessWidget {
-  final String text;
-  const _SectionTitle(this.text);
+/// The newest one or two announcements from the OSCA office.
+class _LatestAnnouncements extends StatelessWidget {
+  final Future<List<Announcement>> future;
+
+  const _LatestAnnouncements({required this.future});
 
   @override
   Widget build(BuildContext context) {
-    return Semantics(
-      header: true,
-      child: Text(
-        text,
-        style: const TextStyle(
-          fontSize: 26,
-          fontWeight: FontWeight.w700,
-          color: AppColors.textPrimary,
-        ),
-      ),
+    return FutureBuilder<List<Announcement>>(
+      future: future,
+      builder: (context, snapshot) {
+        if (snapshot.connectionState != ConnectionState.done) {
+          return const Padding(
+            padding: EdgeInsets.all(24),
+            child: Center(child: CircularProgressIndicator()),
+          );
+        }
+        final items = snapshot.data ?? const <Announcement>[];
+        if (snapshot.hasError || items.isEmpty) {
+          return const Text(
+            'No announcements right now. Pull down to refresh.',
+            style: TextStyle(fontSize: 15, color: AppColors.textSecondary),
+          );
+        }
+        return Column(
+          crossAxisAlignment: CrossAxisAlignment.stretch,
+          children: [
+            for (final item in items.take(2)) ...[
+              AnnouncementCard(
+                announcement: item,
+                width: null,
+                showReadMore: true,
+                onTap: () => context.push(Routes.announcements),
+              ),
+              const SizedBox(height: 14),
+            ],
+          ],
+        );
+      },
     );
   }
 }
@@ -607,11 +726,15 @@ class _QuickTile extends StatelessWidget {
   final String subtitle;
   final VoidCallback onTap;
 
+  /// The first tile has a filled green icon, like the mockup.
+  final bool highlight;
+
   const _QuickTile({
     required this.icon,
     required this.title,
     required this.subtitle,
     required this.onTap,
+    this.highlight = false,
   });
 
   @override
@@ -620,114 +743,44 @@ class _QuickTile extends StatelessWidget {
       button: true,
       child: InfoCard(
         outlined: true,
-        onTap: onTap,
-        padding: const EdgeInsets.all(18),
+        onTap: () {
+          HapticFeedback.selectionClick();
+          onTap();
+        },
+        padding: const EdgeInsets.all(16),
         child: Column(
           crossAxisAlignment: CrossAxisAlignment.start,
           children: [
             Container(
-              width: 60,
-              height: 60,
+              width: 48,
+              height: 48,
               decoration: BoxDecoration(
-                color: AppColors.primary,
-                borderRadius: BorderRadius.circular(16),
+                color: highlight ? AppColors.primary : AppColors.primaryLight,
+                borderRadius: BorderRadius.circular(20),
               ),
-              child: Icon(icon, color: Colors.white, size: 32),
+              child: Icon(
+                icon,
+                color: highlight ? Colors.white : AppColors.primary,
+                size: 26,
+              ),
             ),
-            const SizedBox(height: 18),
+            const SizedBox(height: 14),
             Text(
               title,
               style: const TextStyle(
-                fontSize: 20,
+                fontSize: 15,
                 fontWeight: FontWeight.w700,
                 color: AppColors.textPrimary,
                 height: 1.2,
               ),
             ),
-            const SizedBox(height: 6),
+            const SizedBox(height: 4),
             Text(
               subtitle,
               style: const TextStyle(
-                fontSize: 17,
+                fontSize: 13,
                 color: AppColors.textSecondary,
                 height: 1.35,
-              ),
-            ),
-          ],
-        ),
-      ),
-    );
-  }
-}
-
-/// Small announcement card (Home carousel). Also used in AnnouncementsView.
-class AnnouncementCard extends StatelessWidget {
-  final Announcement announcement;
-  final VoidCallback? onTap;
-  final double? width;
-  final bool showFullText;
-
-  const AnnouncementCard({
-    super.key,
-    required this.announcement,
-    this.onTap,
-    this.width = 300,
-    this.showFullText = false,
-  });
-
-  @override
-  Widget build(BuildContext context) {
-    return SizedBox(
-      width: width,
-      child: InfoCard(
-        outlined: true,
-        onTap: onTap,
-        padding: const EdgeInsets.all(20),
-        child: Column(
-          crossAxisAlignment: CrossAxisAlignment.start,
-          children: [
-            Row(
-              children: [
-                Container(
-                  width: 48,
-                  height: 48,
-                  decoration: const BoxDecoration(
-                    color: AppColors.primaryLight,
-                    shape: BoxShape.circle,
-                  ),
-                  child: const Icon(Icons.campaign_outlined,
-                      color: AppColors.primary, size: 26),
-                ),
-                const SizedBox(width: 12),
-                Text(
-                  DateFormat('MMM d, y').format(announcement.date),
-                  style: const TextStyle(
-                    fontSize: 17,
-                    color: AppColors.textSecondary,
-                  ),
-                ),
-              ],
-            ),
-            const SizedBox(height: 14),
-            Text(
-              announcement.title,
-              style: const TextStyle(
-                fontSize: 21,
-                fontWeight: FontWeight.w700,
-                color: AppColors.textPrimary,
-                height: 1.25,
-              ),
-            ),
-            const SizedBox(height: 8),
-            Text(
-              announcement.body,
-              maxLines: showFullText ? null : 3,
-              overflow:
-              showFullText ? TextOverflow.visible : TextOverflow.ellipsis,
-              style: const TextStyle(
-                fontSize: 17,
-                color: AppColors.textSecondary,
-                height: 1.4,
               ),
             ),
           ],

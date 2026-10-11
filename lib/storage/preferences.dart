@@ -9,7 +9,8 @@ import '../models/user_profile.dart';
 class Preferences {
   static const _kStage = 'onboarding_stage';
   static const _kProfile = 'user_profile';
-  static const _kEmergency = 'emergency_contact';
+  static const _kEmergency = 'emergency_contact'; // older, single contact
+  static const _kEmergencyList = 'emergency_contacts';
   static const _kTextScale = 'text_scale';
   static const _kHighContrast = 'high_contrast';
   static const _kLanguage = 'language';
@@ -39,19 +40,31 @@ class Preferences {
   Future<void> saveProfile(UserProfile p) =>
       _prefs.setString(_kProfile, p.encode());
 
-  // Emergency contact
-  EmergencyContact? get emergencyContact {
-    final raw = _prefs.getString(_kEmergency);
-    if (raw == null) return null;
+  // Emergency contacts, in the order SOS calls them
+  List<EmergencyContact> get emergencyContacts {
+    final raw = _prefs.getString(_kEmergencyList);
+    if (raw != null) {
+      try {
+        return EmergencyContact.decodeList(raw);
+      } catch (_) {
+        return const [];
+      }
+    }
+    // Older installs saved only one contact.
+    final single = _prefs.getString(_kEmergency);
+    if (single == null) return const [];
     try {
-      return EmergencyContact.decode(raw);
+      return [EmergencyContact.decode(single)];
     } catch (_) {
-      return null;
+      return const [];
     }
   }
 
-  Future<void> saveEmergencyContact(EmergencyContact c) =>
-      _prefs.setString(_kEmergency, c.encode());
+  Future<void> saveEmergencyContacts(List<EmergencyContact> contacts) async {
+    await _prefs.setString(
+        _kEmergencyList, EmergencyContact.encodeList(contacts));
+    await _prefs.remove(_kEmergency);
+  }
 
   // Accessibility (these stay after log out)
   double get textScale => _prefs.getDouble(_kTextScale) ?? 1.0;
@@ -69,6 +82,7 @@ class Preferences {
     await _prefs.remove(_kStage);
     await _prefs.remove(_kProfile);
     await _prefs.remove(_kEmergency);
+    await _prefs.remove(_kEmergencyList);
   }
 
   /// Remove everything, settings included.

@@ -5,8 +5,8 @@ import '../../../models/benefit.dart';
 import '../../../services/benefits_service.dart';
 import '../../../theme/app_colors.dart';
 import '../../../theme/app_theme.dart';
+import '../../../widgets/announcement_card.dart';
 import '../../../widgets/big_button.dart';
-import 'home_dashboard_view.dart';
 
 /// "View all" announcements.
 class AnnouncementsView extends StatefulWidget {

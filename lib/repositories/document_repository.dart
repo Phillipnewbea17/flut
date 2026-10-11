@@ -29,6 +29,9 @@ class DocumentRepository extends ChangeNotifier {
 
   List<DocumentItem> get documents => List.unmodifiable(_items);
 
+  /// False without a backend address: photos stay on this phone, unsent.
+  bool get sendsToOffice => _service.sendsToOffice;
+
   /// The newest photo of [type], or null.
   DocumentItem? latestOf(DocumentType type) {
     DocumentItem? latest;
