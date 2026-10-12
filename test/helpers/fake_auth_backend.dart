@@ -137,9 +137,14 @@ class FakeAuthBackend implements AuthService {
     sessionPhone = phone;
   }
 
-  /// No phone is trusted here: every login asks for a code.
+  /// True when this phone verified a code before, so the real backend
+  /// would have given it a device key: logging in needs only the MPIN.
+  /// Off by default, so every login asks for a code.
+  bool trustsThisPhone = false;
+
   @override
-  Future<String?> trustedPhone() async => null;
+  Future<String?> trustedPhone() async =>
+      trustsThisPhone ? sessionPhone ?? _codePhone : null;
 
   @override
   Future<void> loginOnTrustedPhone({
@@ -147,7 +152,22 @@ class FakeAuthBackend implements AuthService {
     required String mpin,
   }) async {
     calls.add('login-trusted');
-    throw const AuthException(AuthError.deviceNotTrusted);
+    if (!trustsThisPhone) {
+      throw const AuthException(AuthError.deviceNotTrusted);
+    }
+    if (_wrongMpins >= maxMpinAttempts) {
+      throw const AuthException(AuthError.mpinLocked);
+    }
+    if (mpins[phone] != mpin) {
+      _wrongMpins++;
+      if (_wrongMpins >= maxMpinAttempts) {
+        throw const AuthException(AuthError.mpinLocked);
+      }
+      throw AuthException(AuthError.wrongMpin,
+          attemptsLeft: maxMpinAttempts - _wrongMpins);
+    }
+    _wrongMpins = 0;
+    sessionPhone = phone;
   }
 
   @override

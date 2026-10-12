@@ -9,7 +9,7 @@ import 'package:my_senior_app/models/onboarding_stage.dart';
 import 'package:my_senior_app/models/registration_name.dart';
 import 'package:my_senior_app/services/auth_service.dart';
 import 'package:my_senior_app/storage/preferences.dart';
-import 'package:my_senior_app/storage/secure_vault.dart';
+import 'package:my_senior_app/storage/auth_storage.dart';
 import 'package:shared_preferences/shared_preferences.dart';
 
 import 'helpers/fake_auth_backend.dart';
@@ -37,17 +37,31 @@ void main() {
   late List<String> signedIn;
   late int wiped;
 
+  /// Starts the app as main() does: one session, one LoginFlow, and the
+  /// splash hook that opens "Enter your MPIN" on a registered phone.
   Future<SessionProvider> start() async {
     final s = SessionProvider(
       prefs: prefs,
-      vault: const SecureVault(),
+      storage: const AuthStorage(),
       auth: backend,
     )
       ..afterSignIn = ((phone, name) async => signedIn.add(phone))
       ..addLogoutHook(() async => wiped++);
+    login = LoginFlow(auth: backend, session: s);
+    s.resumeMpinLogin = (phone, fullName) => login.resumeOnThisPhone(phone);
     await s.init();
     await s.finishSplash();
     return s;
+  }
+
+  /// Create Account from the first screen to Home.
+  Future<void> createAccount() async {
+    await registration.saveName(_name);
+    backend.nextCode = '5190';
+    await registration.requestRegistrationOtp(_phone);
+    await registration.verifyRegistrationOtp('5190');
+    await registration.createMpin('4827');
+    await registration.confirmMpin('4827');
   }
 
   setUp(() async {
@@ -59,7 +73,6 @@ void main() {
     wiped = 0;
     session = await start();
     registration = RegistrationFlow(auth: backend, session: session);
-    login = LoginFlow(auth: backend, session: session);
     reset = MpinResetFlow(auth: backend, session: session);
   });
 
@@ -373,6 +386,78 @@ void main() {
     });
   });
 
+  group('a phone that already has the account', () {
+    test('closing and opening the app shows Enter your MPIN', () async {
+      await createAccount();
+      expect(session.stage, OnboardingStage.completed);
+
+      // Close and open the app again.
+      final next = await start();
+      expect(next.isRegistered, isTrue);
+      expect(next.stage, OnboardingStage.mpinEntry,
+          reason: 'never the Create Account flow again');
+      expect(next.flow, AuthFlow.login);
+      expect(next.lastPhone, _phone);
+      expect(backend.calls, isNot(contains('code:login')),
+          reason: 'no code is texted on a restart');
+    });
+
+    test('the MPIN opens Home with no code', () async {
+      backend.trustsThisPhone = true;
+      await createAccount();
+      final next = await start();
+
+      await login.verifyMpin('4827');
+      expect(next.stage, OnboardingStage.completed);
+      expect(backend.calls, contains('login-trusted'));
+      expect(backend.calls.where((c) => c.startsWith('code:')).length, 1,
+          reason: 'only Create Account texted a code');
+    });
+
+    test('a wrong MPIN is caught on the phone and the tries run out',
+        () async {
+      await createAccount();
+      final next = await start();
+
+      for (var i = 1; i < AuthStorage.maxMpinAttempts; i++) {
+        await expectLater(
+            login.verifyMpin('4828'), _authError(AuthError.wrongMpin));
+      }
+      await expectLater(
+          login.verifyMpin('4828'), _authError(AuthError.mpinLocked));
+      // Locked until Forgot MPIN, even for the right MPIN.
+      await expectLater(
+          login.verifyMpin('4827'), _authError(AuthError.mpinLocked));
+      expect(next.stage, OnboardingStage.mpinEntry);
+      expect(backend.calls, isNot(contains('login-trusted')),
+          reason: 'the hash on this phone answered');
+    });
+
+    test('Forgot MPIN only changes the MPIN', () async {
+      await createAccount();
+      final next = await start();
+      final nextReset = MpinResetFlow(auth: backend, session: next);
+
+      await next.startFlow(AuthFlow.resetMpin);
+      backend.nextCode = '6011';
+      await nextReset.requestResetOtp(_phone);
+      await nextReset.verifyResetOtp('6011');
+      await nextReset.createMpin('3958');
+      await nextReset.confirmMpin('3958');
+
+      expect(backend.mpins[_phone], '3958');
+      expect(backend.calls.where((c) => c == 'register').length, 1,
+          reason: 'the account is not created again');
+      expect(next.isRegistered, isTrue);
+
+      // This phone now checks the new MPIN.
+      await expectLater(
+          login.verifyMpin('4827'), _authError(AuthError.wrongMpin));
+      final after = await start();
+      expect(after.stage, OnboardingStage.mpinEntry);
+    });
+  });
+
   group('session', () {
     Future<void> signIn() async {
       backend.mpins[_phone] = '4827';
@@ -380,7 +465,7 @@ void main() {
       await login.requestLoginOtp(_phone);
       await login.verifyLoginOtp('5190');
       await login.verifyMpin('4827');
-      await const SecureVault().saveToken('1|secret');
+      await const AuthStorage().saveToken('1|secret');
     }
 
     test('a valid saved session opens Home on the next start', () async {
@@ -389,12 +474,14 @@ void main() {
       expect(next.stage, OnboardingStage.completed);
     });
 
-    test('an expired saved session goes to Login', () async {
+    test('an expired saved session asks for the MPIN again', () async {
       await signIn();
       backend.sessionStatus = SessionStatus.expired;
       final next = await start();
-      expect(next.stage, OnboardingStage.signedOut);
+      // Registered on this phone: the MPIN screen, not Create Account.
+      expect(next.stage, OnboardingStage.mpinEntry);
       expect(next.flow, AuthFlow.login);
+      expect(next.isRegistered, isTrue);
       expect(next.takeNotice(), contains('session has ended'));
     });
 
@@ -410,7 +497,7 @@ void main() {
       expect(session.stage, OnboardingStage.signedOut);
       expect(session.flow, AuthFlow.login);
       expect(wiped, 1);
-      expect(await const SecureVault().readToken(), isNull);
+      expect(await const AuthStorage().readToken(), isNull);
     });
 
     test('logout clears this phone only, then Login', () async {
@@ -420,7 +507,7 @@ void main() {
       expect(session.flow, AuthFlow.login);
       expect(backend.calls.last, 'sign-out');
       expect(wiped, 1);
-      expect(await const SecureVault().readToken(), isNull);
+      expect(await const AuthStorage().readToken(), isNull);
       expect(backend.mpins[_phone], '4827');
     });
 
@@ -433,6 +520,18 @@ void main() {
       expect(await session.changeMpin(currentMpin: '4827', newMpin: '3958'),
           isNull);
       expect(backend.mpins[_phone], '3958');
+    });
+
+    test('logout forgets this phone: Welcome again', () async {
+      await createAccount();
+      expect(session.isRegistered, isTrue);
+      await session.logout();
+      expect(session.isRegistered, isFalse);
+
+      final next = await start();
+      expect(next.isRegistered, isFalse);
+      expect(next.stage, OnboardingStage.signedOut);
+      expect(next.flow, isNull, reason: 'Welcome: Create Account or Login');
     });
 
     test('an old plain-text MPIN on the phone is deleted', () async {

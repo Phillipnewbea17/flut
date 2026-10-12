@@ -5,7 +5,7 @@ import '../models/onboarding_stage.dart';
 import '../models/user_profile.dart';
 
 /// Non-secret data saved on the phone (profile, stage, text size, language).
-/// The MPIN goes in SecureVault, NOT here.
+/// The MPIN goes in AuthStorage, NOT here.
 class Preferences {
   static const _kStage = 'onboarding_stage';
   static const _kProfile = 'user_profile';

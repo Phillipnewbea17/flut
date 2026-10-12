@@ -8,7 +8,7 @@ import 'package:my_senior_app/models/onboarding_stage.dart';
 import 'package:my_senior_app/models/registration_name.dart';
 import 'package:my_senior_app/services/api_client.dart';
 import 'package:my_senior_app/services/auth_service.dart';
-import 'package:my_senior_app/storage/secure_vault.dart';
+import 'package:my_senior_app/storage/auth_storage.dart';
 
 /// One canned answer, and the last request the "backend" received.
 class _Backend {
@@ -26,7 +26,7 @@ class _Backend {
   );
 
   late final ApiAuthService auth =
-      ApiAuthService(api: api, vault: const SecureVault());
+      ApiAuthService(api: api, storage: const AuthStorage());
 
   Map<String, dynamic> get sent =>
       jsonDecode(last!.body) as Map<String, dynamic>;
@@ -114,7 +114,7 @@ void main() {
       expect(b.sent,
           {'phone': '9171234567', 'code': '4827', 'purpose': 'login'});
       expect(b.api.token, isNull);
-      expect(await const SecureVault().readToken(), isNull);
+      expect(await const AuthStorage().readToken(), isNull);
     });
 
     test('an incorrect code, with tries left', () {
@@ -204,7 +204,7 @@ void main() {
         'mpin': '4827',
       });
       expect(b.api.token, '1|secret');
-      expect(await const SecureVault().readToken(), '1|secret');
+      expect(await const AuthStorage().readToken(), '1|secret');
     });
 
     test('correct MPIN login saves the session token', () async {
@@ -266,11 +266,11 @@ void main() {
     });
 
     test('an expired session is forgotten', () async {
-      await const SecureVault().saveToken('1|old');
+      await const AuthStorage().saveToken('1|old');
       final b = _Backend(401, '{"message":"Unauthenticated."}');
       expect(await b.auth.checkSession(), SessionStatus.expired);
       expect(b.api.token, isNull);
-      expect(await const SecureVault().readToken(), isNull);
+      expect(await const AuthStorage().readToken(), isNull);
     });
 
     test('no token at all', () async {
@@ -282,19 +282,19 @@ void main() {
         baseUrl: 'http://backend:8000',
         client: MockClient((_) async => throw http.ClientException('down')),
       )..token = '1|secret';
-      final auth = ApiAuthService(api: api, vault: const SecureVault());
+      final auth = ApiAuthService(api: api, storage: const AuthStorage());
       expect(await auth.checkSession(), SessionStatus.offline);
       expect(api.token, '1|secret');
     });
 
     test('logout tells the backend and forgets the token', () async {
-      await const SecureVault().saveToken('1|secret');
+      await const AuthStorage().saveToken('1|secret');
       final b = _Backend(200, '{"ok":true}');
       b.api.token = '1|secret';
       await b.auth.signOut();
       expect(b.last!.url.path, '/api/mobile/auth/sign-out');
       expect(b.api.token, isNull);
-      expect(await const SecureVault().readToken(), isNull);
+      expect(await const AuthStorage().readToken(), isNull);
     });
 
     test('a refused token on a signed-in request reports the expiry', () async {

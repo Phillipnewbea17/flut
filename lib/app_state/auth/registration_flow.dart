@@ -154,7 +154,9 @@ class RegistrationFlow implements OtpStep, NewMpinStep {
 
     final phone = _otp.phone;
     reset();
-    await _session.startSession(phone, name: name);
+    // The last step: the session saves "this phone is registered" (number,
+    // name and the MPIN as a hash) and waits for it before opening Home.
+    await _session.startSession(phone, name: name, mpin: mpin);
   }
 
   /// The code's ticket is missing or too old: start again at the number.

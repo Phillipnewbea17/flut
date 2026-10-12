@@ -42,8 +42,8 @@ class DocumentRepository extends ChangeNotifier {
     return latest;
   }
 
-  static List<DocumentType> get requiredTypes =>
-      DocumentType.values.where((t) => t.isRequired).toList();
+  /// Every paper is required: the four the OSCA office checks.
+  static List<DocumentType> get requiredTypes => DocumentType.values;
 
   /// True when every required paper was sent.
   bool get hasAllRequired =>
@@ -58,7 +58,8 @@ class DocumentRepository extends ChangeNotifier {
     final items = <DocumentItem>[];
     if (raw is List) {
       for (final entry in raw.whereType<Map>()) {
-        var item = DocumentItem.fromJson(Map<String, dynamic>.from(entry));
+        var item = DocumentItem.tryFromJson(Map<String, dynamic>.from(entry));
+        if (item == null) continue; // a paper the office no longer asks for
         if (!await _vault.exists(item.filePath)) continue; // photo is gone
         if (item.status == DocumentStatus.uploading) {
           item = item.copyWith(status: DocumentStatus.failed); // app closed
@@ -71,8 +72,8 @@ class DocumentRepository extends ChangeNotifier {
     notifyListeners();
   }
 
-  /// Saves a new photo of [type] and sends it. Replaces the older photo of
-  /// the same type (except "Other paper", where many are allowed).
+  /// Saves a new photo of [type] and sends it, replacing the older photo of
+  /// the same type.
   Future<DocumentItem> add(DocumentType type, Uint8List bytes) async {
     final now = DateTime.now();
     final id = '${type.name}-${now.millisecondsSinceEpoch}';
@@ -86,9 +87,7 @@ class DocumentRepository extends ChangeNotifier {
       status: DocumentStatus.saved,
     );
 
-    final replaced = type == DocumentType.other
-        ? <DocumentItem>[]
-        : _items.where((d) => d.type == type).toList();
+    final replaced = _items.where((d) => d.type == type).toList();
     final replacedIds = replaced.map((d) => d.id).toSet();
     _items = [..._items.where((d) => !replacedIds.contains(d.id)), item];
     notifyListeners();

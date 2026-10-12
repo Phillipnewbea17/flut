@@ -8,8 +8,9 @@ import 'otp_challenge.dart';
 
 /// Login (returning user, existing account only):
 ///
-///   new phone:     requestLoginOtp -> verifyLoginOtp -> verifyMpin -> Home
-///   trusted phone: requestLoginOtp -> verifyMpin -> Home (no code)
+///   new phone:      requestLoginOtp -> verifyLoginOtp -> verifyMpin -> Home
+///   trusted phone:  requestLoginOtp -> verifyMpin -> Home (no code)
+///   app re-opened:  resumeOnThisPhone -> verifyMpin -> Home (no code)
 ///
 /// A phone is trusted once it verified a code for this number (Create
 /// Account, an earlier login, or Forgot MPIN). Never creates an account,
@@ -31,6 +32,16 @@ class LoginFlow implements OtpStep {
 
   @override
   AuthFlow get kind => AuthFlow.login;
+
+  /// The app was opened again on a phone that already has the account
+  /// (SessionProvider.resumeMpinLogin at the splash): go straight to
+  /// "Enter your MPIN" with its number, without asking for the number and
+  /// without texting a code.
+  Future<void> resumeOnThisPhone(String phone) async {
+    _otp.clear();
+    _trustedPhone = phone;
+    await _session.enter(OnboardingStage.mpinEntry, kind);
+  }
 
   Future<void> requestLoginOtp(String rawPhone) async {
     final phone = UserProvider.normalizePhone(rawPhone);
@@ -72,11 +83,14 @@ class LoginFlow implements OtpStep {
     await _session.enter(OnboardingStage.signedOut, kind);
   }
 
-  /// The existing MPIN, checked by the backend.
+  /// The existing MPIN. The hash kept on this phone catches a wrong MPIN
+  /// first (and counts the tries, so they are limited even offline); the
+  /// backend then checks it again and returns the session.
   Future<void> verifyMpin(String mpin) async {
     if (!MpinValidator.isComplete(mpin)) {
       throw const AuthException(AuthError.wrongMpin);
     }
+    await _session.checkStoredMpin(mpin);
     await authenticate(mpin);
   }
 
@@ -100,7 +114,7 @@ class LoginFlow implements OtpStep {
     }
     final phone = _otp.phone;
     reset();
-    await _session.startSession(phone);
+    await _session.startSession(phone, mpin: mpin);
   }
 
   /// MPIN only. When the backend no longer trusts this phone (the MPIN was
@@ -122,7 +136,7 @@ class LoginFlow implements OtpStep {
       rethrow;
     }
     reset();
-    await _session.startSession(phone);
+    await _session.startSession(phone, mpin: mpin);
   }
 
   Future<Never> _lost() async {

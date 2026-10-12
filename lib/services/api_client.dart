@@ -44,8 +44,11 @@ class ApiException implements Exception {
 /// and discounts, places): reference content shipped with the app, which
 /// the backend has no tables for.
 ///
-/// Set the backend address when running the app:
-///   flutter run --dart-define=API_BASE_URL=https://scms.example.gov.ph
+/// The address is baked in ([permanentBaseUrl]), so an installed app works
+/// on any phone, on mobile data, with no extra flags. Override it for local
+/// work:
+///   flutter run --dart-define=API_BASE_URL=http://localhost:8000
+/// Pass an empty one (--dart-define=API_BASE_URL=) to run with no backend.
 class ApiClient {
   ApiClient({
     AssetBundle? bundle,
@@ -55,7 +58,23 @@ class ApiClient {
     this.timeout = const Duration(seconds: 15),
   })  : _bundle = bundle ?? rootBundle,
         _client = client ?? http.Client(),
-        baseUrl = baseUrl ?? const String.fromEnvironment('API_BASE_URL');
+        baseUrl = baseUrl ??
+            const String.fromEnvironment(
+              'API_BASE_URL',
+              defaultValue: permanentBaseUrl,
+            );
+
+  /// Where the SCMS backend answers when nothing else is given.
+  ///
+  /// 10.0.2.2 is how the Android emulator reaches the computer it runs on,
+  /// so `flutter run` on the emulator talks to `php artisan serve` with no
+  /// flags and no tunnel. It never changes.
+  ///
+  /// A real phone cannot use this address: it has no way to reach the
+  /// computer. Build for one with a public address instead, e.g.
+  ///   flutter build apk --dart-define=API_BASE_URL=https://`tunnel`
+  /// See ella-proj/start-scms.ps1, which opens that address.
+  static const String permanentBaseUrl = 'http://10.0.2.2:8000';
 
   final AssetBundle _bundle;
   final http.Client _client;
@@ -162,6 +181,11 @@ class ApiClient {
       'Could not connect. Please check your internet and try again.',
     );
     request.headers['Accept'] = 'application/json';
+    // A free ngrok address answers an unknown visitor with a warning page
+    // instead of the backend. This header asks for the backend itself.
+    if (request.url.host.endsWith('.ngrok-free.app')) {
+      request.headers['ngrok-skip-browser-warning'] = 'true';
+    }
     final token = this.token;
     if (token != null) request.headers['Authorization'] = 'Bearer $token';
 

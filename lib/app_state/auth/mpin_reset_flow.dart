@@ -94,7 +94,9 @@ class MpinResetFlow implements OtpStep, NewMpinStep {
     }
     final phone = _otp.phone;
     reset();
-    await _session.mpinWasReset(phone);
+    // Only the MPIN changes: the account and this phone's registration
+    // stay as they are.
+    await _session.mpinWasReset(phone, mpin: pin);
   }
 
   @override

@@ -1,6 +1,6 @@
 import '../models/onboarding_stage.dart';
 import '../models/registration_name.dart';
-import '../storage/secure_vault.dart';
+import '../storage/auth_storage.dart';
 import 'api_client.dart';
 
 /// Why a sign-in step failed. Each one has its own plain-words message.
@@ -136,7 +136,7 @@ enum SessionStatus {
 /// hashed. It is never saved on the phone or written to any log.
 ///
 /// A verified code also makes this phone trusted: the backend returns a
-/// device key, kept in the secure vault, and logging in again on this phone
+/// device key, kept by AuthStorage, and logging in again on this phone
 /// needs only the MPIN ([loginOnTrustedPhone]). So a code is texted only for
 /// Create Account, a new phone, and Forgot MPIN.
 abstract class AuthService {
@@ -198,12 +198,12 @@ abstract class AuthService {
 
 /// The real service: /api/mobile/auth/* on the SCMS backend.
 class ApiAuthService implements AuthService {
-  ApiAuthService({required ApiClient api, required SecureVault vault})
+  ApiAuthService({required ApiClient api, required AuthStorage storage})
       : _api = api,
-        _vault = vault;
+        _storage = storage;
 
   final ApiClient _api;
-  final SecureVault _vault;
+  final AuthStorage _storage;
 
   @override
   Future<OtpTicket> requestOtp({
@@ -273,7 +273,7 @@ class ApiAuthService implements AuthService {
   @override
   Future<String?> trustedPhone() async {
     try {
-      return (await _vault.readDevice())?.$1;
+      return (await _storage.readDevice())?.$1;
     } catch (_) {
       return null; // Secure storage unreadable: confirm with a code.
     }
@@ -286,7 +286,7 @@ class ApiAuthService implements AuthService {
   }) async {
     (String, String)? device;
     try {
-      device = await _vault.readDevice();
+      device = await _storage.readDevice();
     } catch (_) {}
     if (device == null || device.$1 != phone) {
       throw const AuthException(AuthError.deviceNotTrusted);
@@ -340,7 +340,7 @@ class ApiAuthService implements AuthService {
   Future<SessionStatus> checkSession() async {
     if (_api.token == null) {
       try {
-        _api.token = await _vault.readToken();
+        _api.token = await _storage.readToken();
       } catch (_) {
         _api.token = null; // Secure storage unreadable: sign in again.
       }
@@ -376,14 +376,14 @@ class ApiAuthService implements AuthService {
     if (token is! String || token.isEmpty) {
       throw const AuthException(AuthError.server);
     }
-    await _vault.saveToken(token);
+    await _storage.saveToken(token);
     _api.token = token;
   }
 
   Future<void> _forgetToken() async {
     _api.token = null;
     try {
-      await _vault.deleteToken();
+      await _storage.deleteToken();
     } catch (_) {}
   }
 
@@ -393,9 +393,9 @@ class ApiAuthService implements AuthService {
     final key = data['deviceKey'];
     try {
       if (key is String && key.isNotEmpty) {
-        await _vault.saveDevice(phone, key);
+        await _storage.saveDevice(phone, key);
       } else {
-        await _vault.deleteDevice();
+        await _storage.deleteDevice();
       }
     } catch (_) {
       // Not saved: the next login asks for a code again.
@@ -404,7 +404,7 @@ class ApiAuthService implements AuthService {
 
   Future<void> _forgetDevice() async {
     try {
-      await _vault.deleteDevice();
+      await _storage.deleteDevice();
     } catch (_) {}
   }
 

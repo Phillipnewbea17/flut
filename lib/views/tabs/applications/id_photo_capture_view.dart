@@ -13,7 +13,7 @@ import '../../../theme/app_theme.dart';
 import '../../../utils/image_compressor.dart';
 import '../../../widgets/big_button.dart';
 
-/// Face photo for the Senior Citizen ID: tips first, then the camera,
+/// 2x2 face photo for the Senior Citizen ID: tips first, then the camera,
 /// then "Use this photo" or "Take again".
 class IdPhotoCaptureView extends StatefulWidget {
   const IdPhotoCaptureView({super.key});
@@ -64,7 +64,7 @@ class _IdPhotoCaptureViewState extends State<IdPhotoCaptureView> {
   Widget build(BuildContext context) {
     final bytes = _bytes;
     return Scaffold(
-      appBar: AppTheme.appBar('ID photo'),
+      appBar: AppTheme.appBar('2x2 photo'),
       body: ListView(
         padding: const EdgeInsets.fromLTRB(24, 24, 24, 40),
         children: bytes == null ? _tips() : _preview(bytes),
@@ -86,7 +86,7 @@ class _IdPhotoCaptureViewState extends State<IdPhotoCaptureView> {
       ),
       const SizedBox(height: 12),
       const _Tip(icon: Icons.wb_sunny_outlined, text: 'Stand facing a window or a bright light.'),
-      const _Tip(icon: Icons.crop_square, text: 'Use a plain white or light wall behind you.'),
+      const _Tip(icon: Icons.crop_square, text: 'Use a plain white wall behind you.'),
       const _Tip(icon: Icons.face_outlined, text: 'Look straight at the camera. No hat, no dark glasses.'),
       const _Tip(icon: Icons.people_outline, text: 'Ask a family member to take it if that is easier.'),
       const SizedBox(height: 24),

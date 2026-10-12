@@ -1,4 +1,4 @@
-import 'package:flutter/foundation.dart';
+import 'package:flutter/widgets.dart';
 
 import '../models/purchase_booklet.dart';
 import '../models/senior_id.dart';
@@ -26,6 +26,12 @@ class WalletRepository extends ChangeNotifier {
   bool get hasSeniorId => _seniorId != null;
   bool get loading => _loading;
   PurchaseBooklet get booklet => PurchaseBooklet(List.unmodifiable(_entries));
+
+  /// The ID photo held by the office (signed in), or null when there is none.
+  ImageProvider? get idPhoto {
+    final url = _seniorId?.photoUrl ?? '';
+    return url.isEmpty ? null : _service.idPhoto(url);
+  }
 
   Future<void> load() async {
     if (_loading) return;

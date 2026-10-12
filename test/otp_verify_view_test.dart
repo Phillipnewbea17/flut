@@ -10,7 +10,7 @@ import 'package:my_senior_app/models/onboarding_stage.dart';
 import 'package:my_senior_app/models/registration_name.dart';
 import 'package:my_senior_app/services/auth_service.dart';
 import 'package:my_senior_app/storage/preferences.dart';
-import 'package:my_senior_app/storage/secure_vault.dart';
+import 'package:my_senior_app/storage/auth_storage.dart';
 import 'package:my_senior_app/views/onboarding/mpin_view.dart';
 import 'package:my_senior_app/views/onboarding/otp_verify_view.dart';
 import 'package:my_senior_app/views/onboarding/register_name_view.dart';
@@ -57,7 +57,7 @@ Future<_Auth> _atCode(
   await tester.runAsync(() async {
     final prefs = await Preferences.load();
     auth = _Auth(
-      SessionProvider(prefs: prefs, vault: const SecureVault(), auth: backend),
+      SessionProvider(prefs: prefs, storage: const AuthStorage(), auth: backend),
       backend,
     );
     switch (flow) {
@@ -136,7 +136,7 @@ void main() {
       final backend = FakeAuthBackend();
       final prefs = await tester.runAsync(Preferences.load);
       final auth = _Auth(
-        SessionProvider(prefs: prefs!, vault: const SecureVault(), auth: backend),
+        SessionProvider(prefs: prefs!, storage: const AuthStorage(), auth: backend),
         backend,
       );
       await _pump(tester, auth, const RegisterNameView(), height: 1600);

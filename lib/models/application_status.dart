@@ -166,7 +166,8 @@ class ApplicationStatus {
       documents: rawDocuments is List
           ? rawDocuments
           .whereType<Map>()
-          .map((e) => DocumentReview.fromJson(Map<String, dynamic>.from(e)))
+          .map((e) => DocumentReview.tryFromJson(Map<String, dynamic>.from(e)))
+          .whereType<DocumentReview>()
           .toList()
           : const [],
     );

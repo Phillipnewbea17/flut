@@ -14,9 +14,9 @@ class FaqView extends StatelessWidget {
     ),
     (
       'What papers do I need?',
-      'A birth certificate or any valid ID with your birthday, a barangay '
-          'certificate, and a 1x1 photo. You can send photos of them in '
-          'Upload documents.',
+      'Four papers: a valid ID, your birth certificate, a proof of residence '
+          '(barangay certificate or utility bill), and a 2x2 photo. You can '
+          'send photos of them in Upload documents.',
     ),
     (
       'How long does it take?',

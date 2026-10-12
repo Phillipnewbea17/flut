@@ -210,9 +210,6 @@ class _UploadDocumentsViewState extends State<UploadDocumentsView> {
     final documents = context.watch<DocumentRepository>();
     final status = context.watch<ApplicationRepository>().status;
     final stage = status.stage;
-    final others = documents.documents
-        .where((d) => d.type == DocumentType.other)
-        .toList();
 
     DocumentState stateOf(DocumentType type) => documentStateOf(
           item: documents.latestOf(type),
@@ -272,13 +269,7 @@ class _UploadDocumentsViewState extends State<UploadDocumentsView> {
             ),
             const SizedBox(height: 14),
           ],
-          _OtherPapersCard(
-            items: others,
-            busy: _busyType == DocumentType.other,
-            onCamera: () => _capture(DocumentType.other, ImageSource.camera),
-            onGallery: () => _capture(DocumentType.other, ImageSource.gallery),
-          ),
-          const SizedBox(height: 24),
+          const SizedBox(height: 10),
           if (stage.canSubmit) ...[
             BigButton(
               label: _submitting ? 'Sending...' : 'Send my application',
@@ -460,80 +451,6 @@ class _DocumentCard extends StatelessWidget {
 }
 
 enum _PhotoChoice { send, retake }
-
-class _OtherPapersCard extends StatelessWidget {
-  final List<DocumentItem> items;
-  final bool busy;
-  final VoidCallback onCamera;
-  final VoidCallback onGallery;
-
-  const _OtherPapersCard({
-    required this.items,
-    required this.busy,
-    required this.onCamera,
-    required this.onGallery,
-  });
-
-  @override
-  Widget build(BuildContext context) {
-    return InfoCard(
-      outlined: true,
-      padding: const EdgeInsets.all(18),
-      child: Column(
-        crossAxisAlignment: CrossAxisAlignment.stretch,
-        children: [
-          Text(
-            '${DocumentType.other.title} (if asked)',
-            style: const TextStyle(
-              fontSize: 20,
-              fontWeight: FontWeight.w700,
-              color: AppColors.textPrimary,
-            ),
-          ),
-          const SizedBox(height: 4),
-          Text(
-            DocumentType.other.hint,
-            style: const TextStyle(fontSize: 16, color: AppColors.textSecondary),
-          ),
-          if (items.isNotEmpty) ...[
-            const SizedBox(height: 12),
-            Wrap(
-              spacing: 10,
-              runSpacing: 10,
-              children: [
-                for (final item in items)
-                  _Thumbnail(item: item, icon: Icons.description_outlined),
-              ],
-            ),
-          ],
-          const SizedBox(height: 14),
-          if (busy)
-            const Center(child: CircularProgressIndicator())
-          else
-            Row(
-              children: [
-                Expanded(
-                  child: _ActionButton(
-                    icon: Icons.photo_camera_outlined,
-                    label: 'Camera',
-                    onPressed: onCamera,
-                  ),
-                ),
-                const SizedBox(width: 10),
-                Expanded(
-                  child: _ActionButton(
-                    icon: Icons.photo_library_outlined,
-                    label: 'Gallery',
-                    onPressed: onGallery,
-                  ),
-                ),
-              ],
-            ),
-        ],
-      ),
-    );
-  }
-}
 
 class _Thumbnail extends StatelessWidget {
   final DocumentItem? item;

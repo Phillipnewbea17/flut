@@ -38,6 +38,13 @@ class SeniorId {
   final DateTime issuedAt;
   final SeniorIdStatus status;
 
+  /// The office's record number for this senior, e.g. "SC-2026-0010".
+  final String recordNo;
+
+  /// Age and sex as the office recorded them ('' when not recorded).
+  final int? age;
+  final String sex;
+
   /// Web address of the ID photo, if the office has one.
   final String photoUrl;
 
@@ -49,6 +56,9 @@ class SeniorId {
     required this.issuedBy,
     required this.issuedAt,
     this.status = SeniorIdStatus.active,
+    this.recordNo = '',
+    this.age,
+    this.sex = '',
     this.photoUrl = '',
   });
 
@@ -65,6 +75,9 @@ class SeniorId {
         'issuedBy': issuedBy,
         'issuedAt': issuedAt.toIso8601String(),
         'status': status.name,
+        'recordNo': recordNo,
+        'age': age,
+        'sex': sex,
         'photoUrl': photoUrl,
       };
 
@@ -79,6 +92,9 @@ class SeniorId {
       issuedAt:
           DateTime.tryParse(json['issuedAt'] as String? ?? '') ?? DateTime.now(),
       status: SeniorIdStatusInfo.parse(json['status'] as String?),
+      recordNo: json['recordNo'] as String? ?? '',
+      age: (json['age'] as num?)?.toInt(),
+      sex: json['sex'] as String? ?? '',
       photoUrl: json['photoUrl'] as String? ?? '',
     );
   }

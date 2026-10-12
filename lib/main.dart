@@ -8,6 +8,7 @@ import 'app_state/auth/mpin_reset_flow.dart';
 import 'app_state/auth/registration_flow.dart';
 import 'app_state/session_provider.dart';
 import 'app_state/user_provider.dart';
+import 'models/user_profile.dart';
 import 'repositories/application_repository.dart';
 import 'repositories/document_repository.dart';
 import 'repositories/identity_repository.dart';
@@ -29,10 +30,10 @@ import 'services/profile_photo_store.dart';
 import 'services/requests_service.dart';
 import 'services/sos_service.dart';
 import 'services/wallet_service.dart';
+import 'storage/auth_storage.dart';
 import 'storage/document_vault.dart';
 import 'storage/local_db.dart';
 import 'storage/preferences.dart';
-import 'storage/secure_vault.dart';
 import 'theme/app_theme.dart';
 import 'theme/high_contrast_theme.dart';
 import 'utils/image_compressor.dart';
@@ -45,7 +46,7 @@ Future<void> main() async {
 
   // Storage
   final prefs = await Preferences.load();
-  const vault = SecureVault();
+  const storage = AuthStorage();
   final db = await LocalDb.open();
   final documentVault = await DocumentVault.open();
 
@@ -57,11 +58,11 @@ Future<void> main() async {
       ? ApiClient(baseUrl: DemoBackend.baseUrl, client: await DemoBackend.open())
       : ApiClient();
   final AuthService auth = api.isConnected
-      ? ApiAuthService(api: api, vault: vault)
+      ? ApiAuthService(api: api, storage: storage)
       : const UnavailableAuthService();
   if (api.isConnected) {
     try {
-      api.token = await vault.readToken();
+      api.token = await storage.readToken();
     } catch (_) {
       // Secure storage unreadable: the user signs in again.
     }
@@ -86,7 +87,7 @@ Future<void> main() async {
   final identity = IdentityRepository(service: ApiIdentityService(api), db: db);
 
   // App state
-  final session = SessionProvider(prefs: prefs, vault: vault, auth: auth);
+  final session = SessionProvider(prefs: prefs, storage: storage, auth: auth);
   final user = UserProvider(prefs);
   final accessibility = await AccessibilityProvider.load(prefs);
 
@@ -104,6 +105,24 @@ Future<void> main() async {
     if (name != null) await user.applyRegistrationName(name);
     final profile = await identity.refreshFromServer();
     if (profile != null) await user.applyLinkedProfile(profile);
+    // Keep the name the MPIN screen greets with ("Welcome back, Rosela").
+    final fullName = user.profile?.fullName ?? '';
+    if (fullName.isNotEmpty) {
+      try {
+        await storage.saveAccountName(fullName);
+      } catch (_) {}
+    }
+  };
+
+  // The app was opened again on a phone that already has the account:
+  // say who it is, then show "Enter your MPIN". No code is texted and the
+  // Create Account flow is never started again.
+  session.resumeMpinLogin = (phone, fullName) async {
+    await user.confirmPhone(phone);
+    if (fullName != null && fullName.isNotEmpty && user.firstName.isEmpty) {
+      await user.saveProfile(fullName: fullName, role: UserRole.senior);
+    }
+    await login.resumeOnThisPhone(phone);
   };
 
   // The backend refused the session token: back to Login.

@@ -3,8 +3,12 @@
 ///
 /// Only [signedOut], [identitySetup] and [completed] are saved on the phone.
 /// The others last only while the app is open: the code, the verification
-/// token and the MPIN are never saved, so after a restart the steps start
-/// again.
+/// token and the typed MPIN are never saved, so after a restart the steps
+/// start again.
+///
+/// A restart on a phone that already has the account does not start any
+/// flow again: AuthStorage says it is registered and the splash opens
+/// [mpinEntry] (Login, "Enter your MPIN") straight away.
 enum OnboardingStage {
   signedOut, // Welcome, Create Account name, Login or Forgot MPIN number
   phoneEntry, // Create Account: mobile number (after the name)

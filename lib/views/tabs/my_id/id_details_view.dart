@@ -9,8 +9,22 @@ import '../../../widgets/info_card.dart';
 import '../../../widgets/status_pill.dart';
 
 /// Everything printed on the Senior ID, in big text.
-class IdDetailsView extends StatelessWidget {
+class IdDetailsView extends StatefulWidget {
   const IdDetailsView({super.key});
+
+  @override
+  State<IdDetailsView> createState() => _IdDetailsViewState();
+}
+
+class _IdDetailsViewState extends State<IdDetailsView> {
+  @override
+  void initState() {
+    super.initState();
+    // Reachable straight from ID services, so ask the office again here too.
+    WidgetsBinding.instance.addPostFrameCallback((_) {
+      if (mounted) context.read<WalletRepository>().load();
+    });
+  }
 
   @override
   Widget build(BuildContext context) {
@@ -38,7 +52,11 @@ class IdDetailsView extends StatelessWidget {
                       _Row('Status', child: StatusPill(StatusLook.seniorId(id.status))),
                       _Row('Name', value: id.fullName),
                       _Row('OSCA / Senior ID number', value: id.idNumber, selectable: true),
+                      if (id.recordNo.isNotEmpty)
+                        _Row('Record number', value: id.recordNo, selectable: true),
                       _Row('Birthday', value: date.format(id.birthDate)),
+                      if (id.age != null) _Row('Age', value: '${id.age} years old'),
+                      if (id.sex.isNotEmpty) _Row('Sex', value: id.sex),
                       if (id.address.isNotEmpty) _Row('Address', value: id.address),
                       _Row('Issued by', value: id.issuedBy),
                       _Row('Date issued', value: date.format(id.issuedAt)),

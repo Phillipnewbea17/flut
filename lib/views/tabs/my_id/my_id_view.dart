@@ -16,8 +16,25 @@ import '../../../widgets/section_title.dart';
 import '../../../widgets/senior_id_card.dart';
 
 /// My ID tab: the official Senior Citizen ID from the OSCA office.
-class MyIdView extends StatelessWidget {
+class MyIdView extends StatefulWidget {
   const MyIdView({super.key});
+
+  @override
+  State<MyIdView> createState() => _MyIdViewState();
+}
+
+class _MyIdViewState extends State<MyIdView> {
+  @override
+  void initState() {
+    super.initState();
+    // The office issues the ID on the web, so ask again every time the tab
+    // opens - otherwise a newly issued ID would keep saying "not issued yet".
+    WidgetsBinding.instance.addPostFrameCallback((_) {
+      if (!mounted) return;
+      context.read<WalletRepository>().load();
+      context.read<RequestsRepository>().load();
+    });
+  }
 
   @override
   Widget build(BuildContext context) {
@@ -45,6 +62,7 @@ class MyIdView extends StatelessWidget {
               child: SeniorIdCard(
                 seniorId: wallet.seniorId,
                 fallbackName: user.profile?.fullName ?? '',
+                photo: wallet.idPhoto,
               ),
             ),
             Padding(

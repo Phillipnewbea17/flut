@@ -150,6 +150,10 @@ class DemoBackend extends http.BaseClient {
         return _submitApplication(account);
       case 'GET /wallet':
         return _Reply(200, {'seniorId': _seniorId(account)});
+      case 'GET /my-senior-id':
+        // Like the real route: no link means no ID yet, not an error.
+        final issued = account['linked'] == true ? _seniorId(account) : null;
+        return _Reply(200, {'has_id': issued != null, 'seniorId': issued});
       case 'GET /pension':
         return _Reply(200, _pension(account));
       case 'POST /identity/lookup':

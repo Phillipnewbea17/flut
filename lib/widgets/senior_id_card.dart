@@ -11,10 +11,15 @@ class SeniorIdCard extends StatelessWidget {
   final SeniorId? seniorId;
   final String fallbackName;
 
+  /// The ID photo from the office. It needs the sign-in token, so the page
+  /// passes it in (see WalletRepository.idPhoto); null hides the photo.
+  final ImageProvider? photo;
+
   const SeniorIdCard({
     super.key,
     required this.seniorId,
     this.fallbackName = '',
+    this.photo,
   });
 
   @override
@@ -129,8 +134,8 @@ class SeniorIdCard extends StatelessWidget {
         Row(
           crossAxisAlignment: CrossAxisAlignment.start,
           children: [
-            if (id.photoUrl.isNotEmpty) ...[
-              _Photo(url: id.photoUrl),
+            if (photo != null) ...[
+              _Photo(image: photo!),
               const SizedBox(width: 14),
             ],
             Expanded(
@@ -235,9 +240,9 @@ class _StatusBadge extends StatelessWidget {
 
 /// The ID photo from the OSCA office (needs internet).
 class _Photo extends StatelessWidget {
-  final String url;
+  final ImageProvider image;
 
-  const _Photo({required this.url});
+  const _Photo({required this.image});
 
   @override
   Widget build(BuildContext context) {
@@ -247,8 +252,8 @@ class _Photo extends StatelessWidget {
         width: 80,
         height: 96,
         color: const Color(0x2EFFFFFF),
-        child: Image.network(
-          url,
+        child: Image(
+          image: image,
           fit: BoxFit.cover,
           semanticLabel: 'ID photo',
           errorBuilder: (context, error, stack) =>

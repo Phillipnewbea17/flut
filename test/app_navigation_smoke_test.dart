@@ -29,7 +29,7 @@ import 'package:my_senior_app/services/wallet_service.dart';
 import 'package:my_senior_app/storage/document_vault.dart';
 import 'package:my_senior_app/storage/local_db.dart';
 import 'package:my_senior_app/storage/preferences.dart';
-import 'package:my_senior_app/storage/secure_vault.dart';
+import 'package:my_senior_app/storage/auth_storage.dart';
 import 'package:my_senior_app/theme/app_theme.dart';
 import 'package:my_senior_app/utils/image_compressor.dart';
 import 'package:path_provider_platform_interface/path_provider_platform_interface.dart';
@@ -48,8 +48,11 @@ class _TempPaths extends PathProviderPlatform with MockPlatformInterfaceMixin {
   Future<String?> getApplicationDocumentsPath() async => dir.path;
 }
 
-/// Boots the real router and providers (offline data files, like `flutter run`
-/// without API_BASE_URL), with a session the backend accepted.
+/// Boots the real router and providers with no backend (bundled data files
+/// only), and a session the backend accepted. ApiClient now defaults to
+/// [ApiClient.permanentBaseUrl] so `flutter run` reaches the emulator's
+/// backend with no flags, so the empty address is passed explicitly here -
+/// these tests cover what a senior sees when the office cannot be reached.
 Future<GoRouter> _startApp(WidgetTester tester, {double textScale = 1}) async {
   late GoRouter router;
   await tester.runAsync(() async {
@@ -69,14 +72,14 @@ Future<GoRouter> _startApp(WidgetTester tester, {double textScale = 1}) async {
     ));
     final db = await LocalDb.open();
     final vault = await DocumentVault.open();
-    final api = ApiClient(latency: Duration.zero);
+    final api = ApiClient(baseUrl: '', latency: Duration.zero);
 
     // Signed in and linked: a session the backend accepts.
     await prefs.setStage(OnboardingStage.completed);
-    await const SecureVault().saveToken('1|test');
+    await const AuthStorage().saveToken('1|test');
     final backend = FakeAuthBackend()..sessionPhone = '9171234567';
     final session = SessionProvider(
-        prefs: prefs, vault: const SecureVault(), auth: backend);
+        prefs: prefs, storage: const AuthStorage(), auth: backend);
     await session.init();
     await session.finishSplash();
     expect(session.stage, OnboardingStage.completed);

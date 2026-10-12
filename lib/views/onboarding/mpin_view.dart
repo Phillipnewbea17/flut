@@ -21,7 +21,8 @@ import '../../widgets/pin_dots.dart';
 /// - change:  Account > Change MPIN (current, new, then again)
 ///
 /// Every MPIN is checked and saved by Laravel. The typed numbers live only
-/// in memory until they are sent; nothing is saved on the phone.
+/// in memory until they are sent; this phone keeps a salted hash
+/// (AuthStorage) so Unlock can refuse a wrong MPIN without a round trip.
 enum MpinMode { create, confirm, enter, change }
 
 enum _ChangeStep { current, create, confirm }

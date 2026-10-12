@@ -14,8 +14,22 @@ import '../../../widgets/section_title.dart';
 
 /// "ID services" (Home quick action): everything about the Senior ID.
 /// Issuing, activating and deactivating IDs stay in the web app.
-class IdServicesView extends StatelessWidget {
+class IdServicesView extends StatefulWidget {
   const IdServicesView({super.key});
+
+  @override
+  State<IdServicesView> createState() => _IdServicesViewState();
+}
+
+class _IdServicesViewState extends State<IdServicesView> {
+  @override
+  void initState() {
+    super.initState();
+    // So the "no ID yet" notice is never stale after the office issues one.
+    WidgetsBinding.instance.addPostFrameCallback((_) {
+      if (mounted) context.read<WalletRepository>().load();
+    });
+  }
 
   @override
   Widget build(BuildContext context) {
