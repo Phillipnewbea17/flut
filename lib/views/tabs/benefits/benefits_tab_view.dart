@@ -6,6 +6,7 @@ import 'package:provider/provider.dart';
 
 import '../../../app_state/accessibility_provider.dart';
 import '../../../models/pension_record.dart';
+import '../../../models/purchase_booklet.dart' show formatPeso;
 import '../../../routes/app_router.dart';
 import '../../../services/pension_service.dart';
 import '../../../theme/app_colors.dart';
@@ -131,31 +132,98 @@ class _MyPension extends StatelessWidget {
           );
         }
         final latest = records.first;
+        final earlier = records.skip(1).toList();
         final date = DateFormat('MMMM d, y');
-        return InfoCard(
-          outlined: true,
-          padding: const EdgeInsets.all(18),
-          child: Column(
-            crossAxisAlignment: CrossAxisAlignment.start,
-            children: [
-              _Field('Period', latest.period),
-              Row(
+        return Column(
+          crossAxisAlignment: CrossAxisAlignment.stretch,
+          children: [
+            InfoCard(
+              outlined: true,
+              padding: const EdgeInsets.all(18),
+              child: Column(
+                crossAxisAlignment: CrossAxisAlignment.start,
                 children: [
-                  Icon(
-                    latest.isReleased ? Icons.check_circle : Icons.schedule,
-                    color: latest.isReleased ? AppColors.success : AppColors.info,
-                    size: 22,
+                  _Field('Period', latest.period),
+                  Row(
+                    children: [
+                      Icon(
+                        latest.isReleased ? Icons.check_circle : Icons.schedule,
+                        color:
+                            latest.isReleased ? AppColors.success : AppColors.info,
+                        size: 22,
+                      ),
+                      const SizedBox(width: 8),
+                      Expanded(child: _Field('Status', latest.status)),
+                    ],
                   ),
-                  const SizedBox(width: 8),
-                  Expanded(child: _Field('Status', latest.status)),
+                  // Set once the office releases it out of a fund.
+                  if (latest.amount != null)
+                    _Field('Amount', formatPeso(latest.amount!)),
+                  if (latest.releaseDate != null)
+                    _Field('Release date', date.format(latest.releaseDate!)),
+                  if (latest.receivedBy.isNotEmpty)
+                    _Field('Received by', latest.receivedBy),
+                  if (latest.reference.isNotEmpty)
+                    _Field('Reference', latest.reference),
                 ],
               ),
-              if (latest.releaseDate != null)
-                _Field('Release date', date.format(latest.releaseDate!)),
-              if (latest.reference.isNotEmpty)
-                _Field('Reference', latest.reference),
+            ),
+            if (earlier.isNotEmpty) ...[
+              const SizedBox(height: 16),
+              const SectionTitle('Earlier releases'),
+              const SizedBox(height: 12),
+              for (final record in earlier)
+                Padding(
+                  padding: const EdgeInsets.only(bottom: 10),
+                  child: InfoCard(
+                    outlined: true,
+                    padding: const EdgeInsets.all(14),
+                    child: Row(
+                      children: [
+                        Icon(
+                          record.isReleased
+                              ? Icons.check_circle_outline
+                              : Icons.schedule,
+                          color: record.isReleased
+                              ? AppColors.success
+                              : AppColors.info,
+                          size: 20,
+                        ),
+                        const SizedBox(width: 10),
+                        Expanded(
+                          child: Column(
+                            crossAxisAlignment: CrossAxisAlignment.start,
+                            children: [
+                              Text(
+                                record.period,
+                                style: const TextStyle(
+                                  fontSize: 16,
+                                  fontWeight: FontWeight.w700,
+                                  color: AppColors.textPrimary,
+                                ),
+                              ),
+                              Text(
+                                [
+                                  record.status,
+                                  if (record.amount != null)
+                                    formatPeso(record.amount!),
+                                  if (record.releaseDate != null)
+                                    date.format(record.releaseDate!),
+                                ].join(' · '),
+                                style: const TextStyle(
+                                  fontSize: 14,
+                                  color: AppColors.textSecondary,
+                                ),
+                              ),
+                            ],
+                          ),
+                        ),
+                      ],
+                    ),
+                  ),
+                ),
             ],
-          ),
+          ],
         );
       },
     );
