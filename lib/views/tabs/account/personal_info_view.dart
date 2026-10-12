@@ -58,6 +58,14 @@ class _PersonalInfoViewState extends State<PersonalInfoView> {
     // Before the ID: the sex the senior sent with the application, if any.
     final sex = (official ?? linked?.info)?.sex?.label ?? '';
 
+    // The address the senior set themselves, or - while they have not set
+    // one - what the OSCA office keeps on their record. A senior citizen
+    // record only holds the purok, so that is usually all this shows.
+    // Change Address still overrides it.
+    final ownAddress = profile.addressLine;
+    final address =
+        ownAddress.isNotEmpty ? ownAddress : (official?.fullAddress ?? '');
+
     return Scaffold(
       backgroundColor: Colors.white,
       body: ListView(
@@ -115,7 +123,7 @@ class _PersonalInfoViewState extends State<PersonalInfoView> {
                 _InfoRow(
                   icon: Icons.location_on_outlined,
                   label: 'Current Address',
-                  value: profile.addressLine.toUpperCase(),
+                  value: address.toUpperCase(),
                   last: true,
                   below: Align(
                     alignment: Alignment.centerLeft,
