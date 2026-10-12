@@ -64,15 +64,48 @@ void main() {
         api.post('/application/submit', {}), throwsA(isA<ApiException>()));
   });
 
-  test('the benefits guide ships with the app', () async {
+  // OSCA keeps the benefit cards in the web app, so the office's wording
+  // wins. The shipped copy is only a backup for when it cannot be reached.
+  test('benefits come from the OSCA office', () async {
     final api = ApiClient(
-      bundle: _FakeBundle({'assets/data/benefits.json': '[{"id":"b1"}]'}),
+      bundle: _FakeBundle({'assets/data/benefits.json': '[{"id":"shipped"}]'}),
+      baseUrl: 'http://backend:8000',
+      latency: Duration.zero,
+      client: MockClient(
+          (_) async => http.Response('[{"id":"from-osca"}]', 200)),
+    );
+
+    expect((await api.get('/benefits') as List).first['id'], 'from-osca');
+  });
+
+  test('benefits fall back to the shipped copy with no signal', () async {
+    final offline = ApiClient(
+      bundle: _FakeBundle({'assets/data/benefits.json': '[{"id":"shipped"}]'}),
+      baseUrl: '',
+      latency: Duration.zero,
+      client: MockClient((_) async => fail('should not call the backend')),
+    );
+    expect((await offline.get('/benefits') as List).first['id'], 'shipped');
+
+    // Reachable, but the office's server is having a bad day.
+    final failing = ApiClient(
+      bundle: _FakeBundle({'assets/data/benefits.json': '[{"id":"shipped"}]'}),
+      baseUrl: 'http://backend:8000',
+      latency: Duration.zero,
+      client: MockClient((_) async => http.Response('oops', 500)),
+    );
+    expect((await failing.get('/benefits') as List).first['id'], 'shipped');
+  });
+
+  test('the places guide still ships with the app', () async {
+    final api = ApiClient(
+      bundle: _FakeBundle({'assets/data/places.json': '[{"id":"p1"}]'}),
       baseUrl: 'http://backend:8000',
       latency: Duration.zero,
       client: MockClient((_) async => fail('should not call the backend')),
     );
 
-    expect((await api.get('/benefits') as List).first['id'], 'b1');
+    expect((await api.get('/places') as List).first['id'], 'p1');
   });
 
   test('a server error becomes an ApiException', () async {

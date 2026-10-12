@@ -99,8 +99,18 @@ class ApiClient {
   /// Guides shipped with the app (not user data; the backend has no tables
   /// for them): address -> file in assets/data/.
   static const Map<String, String> _bundled = {
-    '/benefits': 'benefits.json',
     '/places': 'places.json',
+  };
+
+  /// Addresses the backend answers, but which also ship a copy in the app
+  /// for when it cannot be reached: address -> file in assets/data/.
+  ///
+  /// OSCA keeps the benefit cards in the web app now, so the backend has the
+  /// current wording. Most of them are national law that rarely changes, and
+  /// a senior at a pharmacy counter needs to show what they are entitled to
+  /// even with no signal - so a slightly old copy beats an error.
+  static const Map<String, String> _fallback = {
+    '/benefits': 'benefits.json',
   };
 
   static const ApiException notConnected = ApiException(
@@ -113,8 +123,18 @@ class ApiClient {
   Future<dynamic> get(String path) async {
     final file = _bundled[path];
     if (file != null) return _readBundled(file);
-    if (!isConnected) throw notConnected;
-    return _send(http.Request('GET', _uri(path)));
+
+    final backup = _fallback[path];
+    if (!isConnected) {
+      if (backup != null) return _readBundled(backup);
+      throw notConnected;
+    }
+    try {
+      return await _send(http.Request('GET', _uri(path)));
+    } on ApiException {
+      if (backup != null) return _readBundled(backup);
+      rethrow;
+    }
   }
 
   Future<dynamic> _readBundled(String file) async {
