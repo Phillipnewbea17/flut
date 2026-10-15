@@ -71,22 +71,24 @@ class ApiClient {
 
   /// Where the SCMS backend answers when nothing else is given.
   ///
-  /// 10.0.2.2 is how the Android emulator reaches the computer it runs on,
-  /// so `flutter run` on the emulator talks to `php artisan serve` with no
-  /// flags and no tunnel. It never changes.
+  /// The ngrok address of the laptop that runs `php artisan serve`. It is
+  /// a reserved ngrok domain, so it never changes: any phone, on any Wi-Fi
+  /// or on mobile data, reaches the backend with no flags, as long as
+  /// `ella-proj/start-scms.ps1 -Tunnel ngrok -Domain ...` is running there.
   ///
-  /// A real phone cannot use this address: it has no way to reach the
-  /// computer. Build for one with a public address instead, e.g.
-  ///   flutter build apk --dart-define=API_BASE_URL=https://`tunnel`
-  /// See ella-proj/start-scms.ps1, which opens that address.
-  static const String permanentBaseUrl = 'http://10.0.2.2:8000';
+  /// Override it for local work without the tunnel:
+  ///   emulator:          --dart-define=API_BASE_URL=http://10.0.2.2:8000
+  ///   phone over USB:    --dart-define=API_BASE_URL=http://localhost:8000
+  ///                      (with start-scms.ps1 -Tunnel usb)
+  static const String permanentBaseUrl =
+      'https://reprise-dock-smock.ngrok-free.dev';
 
   final AssetBundle _bundle;
   final http.Client _client;
   final Duration latency;
   final Duration timeout;
 
-  /// The backend address, e.g. "http://10.0.2.2:8000". Empty = offline.
+  /// The backend address, e.g. [permanentBaseUrl]. Empty = offline.
   final String baseUrl;
 
   /// Session token from /auth/login or /auth/register, sent with every

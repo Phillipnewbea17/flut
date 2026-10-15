@@ -50,8 +50,8 @@ class _TempPaths extends PathProviderPlatform with MockPlatformInterfaceMixin {
 
 /// Boots the real router and providers with no backend (bundled data files
 /// only), and a session the backend accepted. ApiClient now defaults to
-/// [ApiClient.permanentBaseUrl] so `flutter run` reaches the emulator's
-/// backend with no flags, so the empty address is passed explicitly here -
+/// [ApiClient.permanentBaseUrl] so `flutter run` reaches the backend with no
+/// flags, so the empty address is passed explicitly here -
 /// these tests cover what a senior sees when the office cannot be reached.
 Future<GoRouter> _startApp(WidgetTester tester, {double textScale = 1}) async {
   late GoRouter router;
