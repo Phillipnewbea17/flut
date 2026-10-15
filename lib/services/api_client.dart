@@ -15,8 +15,12 @@ class ApiException implements Exception {
   /// HTTP status, or null when the server could not be reached.
   final int? statusCode;
 
-  /// Tries left, when the server says (wrong code, wrong MPIN).
+  /// Tries left, when the server says.
   final int? attemptsLeft;
+
+  /// The address the server is talking about, when it names one (an
+  /// account whose email has not been confirmed).
+  final String? email;
 
   /// How long to wait before trying again (429 answers), when known.
   final Duration? retryAfter;
@@ -27,6 +31,7 @@ class ApiException implements Exception {
     this.statusCode,
     this.attemptsLeft,
     this.retryAfter,
+    this.email,
   });
 
   @override
@@ -242,6 +247,7 @@ class ApiClient {
     final message = data is Map && status < 500 ? data['message'] : null;
     final attemptsLeft = data is Map ? data['attemptsLeft'] : null;
     final retryAfter = data is Map ? data['retryAfter'] : null;
+    final email = data is Map ? data['email'] : null;
     final retryHeader = int.tryParse(response.headers['retry-after'] ?? '');
     throw ApiException(
       message is String && message.isNotEmpty
@@ -257,6 +263,7 @@ class ApiClient {
           : retryHeader == null
           ? null
           : Duration(seconds: retryHeader),
+      email: email is String && email.isNotEmpty ? email : null,
     );
   }
 

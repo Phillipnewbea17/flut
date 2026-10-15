@@ -115,10 +115,29 @@ class _PersonalInfoViewState extends State<PersonalInfoView> {
                     value: official.civilStatus?.label ?? '',
                     locked: true,
                   ),
+                // The address the account signs in with. Only the OSCA
+                // office can move an account to another one, so it is shown
+                // locked here.
+                _InfoRow(
+                  icon: Icons.mail_outline,
+                  label: 'Email address',
+                  value: profile.email,
+                  locked: true,
+                ),
                 _InfoRow(
                   icon: Icons.phone_outlined,
                   label: 'Phone number',
                   value: profile.phone.isEmpty ? '' : '+63${profile.phone}',
+                  below: Align(
+                    alignment: Alignment.centerLeft,
+                    child: PillButton(
+                      label: profile.phone.isEmpty
+                          ? 'Add Phone Number'
+                          : 'Change Phone Number',
+                      tonal: true,
+                      onPressed: () => context.push(Routes.phoneNumber),
+                    ),
+                  ),
                 ),
                 _InfoRow(
                   icon: Icons.location_on_outlined,

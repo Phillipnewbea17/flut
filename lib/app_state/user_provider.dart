@@ -63,16 +63,37 @@ class UserProvider extends ChangeNotifier {
       digits.length == 10 && digits.startsWith('9');
 
   // ---------------------------------------------------------------------------
+  // Email helpers (the address the account signs in with and gets codes at)
+  // ---------------------------------------------------------------------------
+
+  /// "  Rosela@GMail.Com " becomes "rosela@gmail.com", so the same inbox is
+  /// always the same account however it was typed.
+  static String normalizeEmail(String raw) => raw.trim().toLowerCase();
+
+  /// Enough of a check to catch a typing mistake before asking the backend
+  /// for a code: something, one @, then a dotted domain. The backend checks
+  /// it again and has the last word.
+  static bool isValidEmail(String email) =>
+      email.length <= 255 && _emailPattern.hasMatch(email);
+
+  static final RegExp _emailPattern = RegExp(
+    r"^[A-Za-z0-9.!#$%&'*+/=?^_`{|}~-]+"
+    r'@[A-Za-z0-9]([A-Za-z0-9-]*[A-Za-z0-9])?'
+    r'(\.[A-Za-z0-9]([A-Za-z0-9-]*[A-Za-z0-9])?)+$',
+  );
+
+  // ---------------------------------------------------------------------------
   // Actions
   // ---------------------------------------------------------------------------
 
-  /// Call after signing in. Saves the phone right away so the number is
-  /// not lost if the app is closed in the middle of setup.
-  Future<void> confirmPhone(String phone) async {
+  /// Call after signing in. Saves the address right away so it is not lost
+  /// if the app is closed in the middle of setup. A different address means
+  /// a different account, so nothing of the old profile is kept.
+  Future<void> confirmEmail(String email) async {
     final previous = _profile;
-    final profile = (previous != null && previous.phone == phone)
+    final profile = (previous != null && previous.email == email)
         ? previous
-        : UserProfile(phone: phone, fullName: '', role: UserRole.senior);
+        : UserProfile(email: email, fullName: '', role: UserRole.senior);
     _profile = profile;
     notifyListeners();
     await _prefs.saveProfile(profile);

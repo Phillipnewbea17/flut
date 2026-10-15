@@ -1,174 +1,122 @@
 import '../../models/onboarding_stage.dart';
 import '../../models/registration_name.dart';
 import '../../services/auth_service.dart';
-import '../../utils/mpin_validator.dart';
+import '../../utils/password_validator.dart';
 import '../session_provider.dart';
-import 'auth_steps.dart';
-import 'otp_challenge.dart';
+import '../user_provider.dart';
 
-/// Create Account (new user):
+/// Sign up (new user):
 ///
-///   name -> requestRegistrationOtp -> verifyRegistrationOtp ->
-///   createMpin -> confirmMpin -> createAccount -> Home
+///   name -> email + password + confirm -> "check your inbox" -> Login
 ///
-/// Nothing is created until [createAccount]: the backend then makes the
-/// account with the name, the verified number and the MPIN (stored hashed),
-/// and returns the session token. The name, the code and the MPIN are only
-/// kept in memory until then.
-class RegistrationFlow implements OtpStep, NewMpinStep {
+/// Nothing exists until [createAccount]: the backend then makes the account
+/// with the name, the address and the password (stored hashed), leaves it
+/// unconfirmed, and emails a link. No session comes back, so the senior
+/// confirms the address and then logs in.
+///
+/// The name is only kept in memory. The address and the password are kept
+/// until the Check Your Inbox screen is left, so "Resend email" can be
+/// offered without asking the senior to type them again.
+class RegistrationFlow {
   RegistrationFlow({required AuthService auth, required SessionProvider session})
       : _auth = auth,
-        _session = session,
-        _otp = OtpChallenge(auth, AuthFlow.register);
+        _session = session;
 
   final AuthService _auth;
   final SessionProvider _session;
-  final OtpChallenge _otp;
 
   RegistrationName? _name;
-  String? _firstMpin;
+  String _email = '';
+  String _password = '';
 
-  @override
   AuthFlow get kind => AuthFlow.register;
 
   /// The name typed in the first step (to fill the form when going back).
   RegistrationName? get name => _name;
 
+  /// The address the confirmation email went to.
+  String get email => _email;
+
   // ---------------------------------------------------------------------------
   // 1. Name
   // ---------------------------------------------------------------------------
 
-  /// Checks the name and opens the mobile number screen. Returns the
+  /// Checks the name and opens the email and password screen. Returns the
   /// problems (field -> message), or an empty map when it moved on.
   Future<Map<String, String>> saveName(RegistrationName name) async {
     final errors = RegistrationName.validate(name);
     if (errors.isNotEmpty) return errors;
     _name = name.cleaned;
-    await _session.enter(OnboardingStage.phoneEntry, kind);
+    await _session.enter(OnboardingStage.credentials, kind);
     return const {};
   }
 
-  /// "Back" on the mobile number screen.
+  /// "Back" on the email and password screen.
   Future<void> backToName() async {
-    _otp.clear();
     await _session.enter(OnboardingStage.signedOut, kind);
   }
 
   // ---------------------------------------------------------------------------
-  // 2. Mobile number and code
+  // 2. Email address and password
   // ---------------------------------------------------------------------------
 
-  /// The backend refuses a number that already has an account.
-  Future<void> requestRegistrationOtp(String rawPhone) async {
-    if (_name == null) return backToName();
-    await _otp.send(rawPhone);
-    await _session.enter(OnboardingStage.otpVerify, kind);
-  }
-
-  Future<void> verifyRegistrationOtp(String code) async {
-    await _otp.verify(code);
-    _firstMpin = null;
-    await _session.enter(OnboardingStage.mpinSetup, kind);
-  }
-
-  @override
-  String get phone => _otp.phone;
-  @override
-  OtpTicket get ticket => _otp.ticket;
-  @override
-  DateTime? get codeSentAt => _otp.sentAt;
-  @override
-  bool get codeExpired => _otp.expired;
-  @override
-  bool get codeLocked => _otp.locked;
-  @override
-  Future<void> resendOtp() => _otp.resend();
-  @override
-  Future<void> verifyOtp(String code) => verifyRegistrationOtp(code);
-
-  @override
-  Future<void> changeNumber() async {
-    _otp.clear();
-    _firstMpin = null;
-    await _session.enter(OnboardingStage.phoneEntry, kind);
-  }
-
-  // ---------------------------------------------------------------------------
-  // 3. MPIN
-  // ---------------------------------------------------------------------------
-
-  @override
-  String? validateNewMpin(String pin) =>
-      MpinValidator.validate(pin, otp: _otp.verifiedCode);
-
-  @override
-  Future<void> createMpin(String pin) async {
-    if (_otp.verificationToken == null) await _lost();
-    if (validateNewMpin(pin) != null) {
-      throw const AuthException(AuthError.weakMpin);
-    }
-    _firstMpin = pin;
-    await _session.enter(OnboardingStage.mpinConfirm, kind);
-  }
-
-  @override
-  Future<void> confirmMpin(String pin) async {
-    final first = _firstMpin;
-    if (first == null) return backToCreateMpin();
-    if (!MpinValidator.matches(first, pin)) {
-      await backToCreateMpin();
-      throw const AuthException(AuthError.mpinMismatch);
-    }
-    await createAccount(pin);
-  }
-
-  @override
-  Future<void> backToCreateMpin() async {
-    _firstMpin = null;
-    await _session.enter(OnboardingStage.mpinSetup, kind);
-  }
-
-  // ---------------------------------------------------------------------------
-  // 4. Account
-  // ---------------------------------------------------------------------------
-
-  /// Laravel creates the account and returns the session. Only then is the
-  /// user signed in and taken Home.
-  Future<void> createAccount(String mpin) async {
+  /// Checks what was typed, then asks Laravel to make the account and send
+  /// the confirmation email. Opens Check Your Inbox when it worked.
+  ///
+  /// The screen checks the same rules first so it can point at the field
+  /// that is wrong; these throws are the backstop.
+  Future<void> createAccount({
+    required String rawEmail,
+    required String password,
+    required String confirmation,
+  }) async {
     final name = _name;
-    final token = _otp.verificationToken;
-    if (name == null || token == null) await _lost();
+    if (name == null) return backToName();
 
-    try {
-      await _auth.register(
-        name: name,
-        phone: _otp.phone,
-        verificationToken: token,
-        mpin: mpin,
-      );
-    } on AuthException catch (e) {
-      if (e.error == AuthError.verificationExpired) await _lost();
-      if (e.error == AuthError.weakMpin) await backToCreateMpin();
-      rethrow;
+    final email = UserProvider.normalizeEmail(rawEmail);
+    if (!UserProvider.isValidEmail(email)) {
+      throw const AuthException(AuthError.invalidEmail);
+    }
+    if (PasswordValidator.validate(password, email: email) != null) {
+      throw const AuthException(AuthError.invalidPassword);
+    }
+    if (!PasswordValidator.matches(password, confirmation)) {
+      throw const AuthException(AuthError.passwordMismatch);
     }
 
-    final phone = _otp.phone;
+    await _auth.register(name: name, email: email, password: password);
+
+    _email = email;
+    _password = password;
+    await _session.enter(OnboardingStage.checkInbox, kind);
+  }
+
+  // ---------------------------------------------------------------------------
+  // 3. Check your inbox
+  // ---------------------------------------------------------------------------
+
+  /// "Resend email". Returns true when the address turned out to be
+  /// confirmed already, so the screen can send the senior to Login.
+  Future<bool> resendVerification() async {
+    if (_email.isEmpty || _password.isEmpty) {
+      throw const AuthException(AuthError.sessionExpired);
+    }
+    return _auth.resendVerification(email: _email, password: _password);
+  }
+
+  /// "I have confirmed it - go to Login". Forgets the password here: from
+  /// now on the senior types it on the Login screen.
+  Future<void> goToLogin() async {
+    final email = _email;
     reset();
-    // The last step: the session saves "this phone is registered" (number,
-    // name and the MPIN as a hash) and waits for it before opening Home.
-    await _session.startSession(phone, name: name, mpin: mpin);
+    await _session.rememberEmail(email);
+    await _session.startFlow(AuthFlow.login);
   }
 
-  /// The code's ticket is missing or too old: start again at the number.
-  Future<Never> _lost() async {
-    await changeNumber();
-    throw const AuthException(AuthError.verificationExpired);
-  }
-
-  /// Log out, or the account was created: forget everything.
+  /// Log out, or the flow finished: forget everything, password included.
   void reset() {
-    _otp.clear();
     _name = null;
-    _firstMpin = null;
+    _email = '';
+    _password = '';
   }
 }

@@ -4,7 +4,6 @@ import 'dart:convert';
 import 'package:http/http.dart' as http;
 import 'package:shared_preferences/shared_preferences.dart';
 
-import 'demo_mode.dart';
 
 /// DEMO MODE ONLY (see demo_mode.dart): a stand-in for the SCMS Laravel
 /// backend that runs on the phone. It answers the same /api/mobile routes
@@ -13,7 +12,7 @@ import 'demo_mode.dart';
 /// never reach the web admin.
 ///
 /// Differences from the real backend, to make trying the app easy:
-/// - the sign-in code is always [kDemoOtp] (no text message);
+/// - the sign-in code is always [kDemoOtp] (no email is sent);
 /// - a new account is linked at once to a sample senior citizen record
 ///   with the name typed in Create Account, so My ID, pension and the
 ///   request services can be tried.
@@ -25,8 +24,8 @@ class DemoBackend extends http.BaseClient {
 
   static const _key = 'demo_backend_v1';
   static const _latency = Duration(milliseconds: 350);
-  static const _maxCodeTries = 5;
-  static const _maxMpinTries = 5;
+  static const _maxPasswordTries = 5;
+  static const _minPassword = 8;
 
   final SharedPreferences _prefs;
   final Map<String, dynamic> _state;
@@ -40,7 +39,7 @@ class DemoBackend extends http.BaseClient {
     } catch (_) {
       state = {};
     }
-    for (final k in ['accounts', 'codes', 'tickets', 'sessions']) {
+    for (final k in ['accounts', 'sessions']) {
       state[k] = Map<String, dynamic>.from((state[k] as Map?) ?? {});
     }
     state['counter'] ??= 0;
@@ -48,8 +47,6 @@ class DemoBackend extends http.BaseClient {
   }
 
   Map<String, dynamic> get _accounts => _state['accounts'] as Map<String, dynamic>;
-  Map<String, dynamic> get _codes => _state['codes'] as Map<String, dynamic>;
-  Map<String, dynamic> get _tickets => _state['tickets'] as Map<String, dynamic>;
   Map<String, dynamic> get _sessions => _state['sessions'] as Map<String, dynamic>;
 
   Future<void> _save() => _prefs.setString(_key, jsonEncode(_state));
@@ -76,13 +73,13 @@ class DemoBackend extends http.BaseClient {
       body.addAll(request.fields);
     }
     final auth = request.headers['Authorization'] ?? '';
-    final phone = auth.startsWith('Bearer ')
+    final email = auth.startsWith('Bearer ')
         ? _sessions[auth.substring(7)] as String?
         : null;
 
     _Reply reply;
     try {
-      reply = await _route(request.method, path, body, phone, auth);
+      reply = await _route(request.method, path, body, email, auth);
     } on _Reply catch (error) {
       reply = error;
     }
@@ -101,45 +98,42 @@ class DemoBackend extends http.BaseClient {
       _Reply(status, {'message': message, 'code': code, ...extra});
 
   Future<_Reply> _route(String method, String path, Map<String, dynamic> body,
-      String? phone, String auth) async {
+      String? email, String auth) async {
     final key = '$method $path';
 
     // Public routes.
     switch (key) {
-      case 'POST /auth/code':
-        return _sendCode(body);
-      case 'POST /auth/verify':
-        return _verifyCode(body);
       case 'POST /auth/register':
         return _register(body);
       case 'POST /auth/login':
         return _login(body);
-      case 'POST /auth/mpin/reset':
-        return _resetMpin(body);
+      case 'POST /auth/verification/resend':
+        return _resendVerification(body);
+      case 'POST /auth/password/forgot':
+        return _forgotPassword(body);
       case 'GET /announcements':
         return _Reply(200, _announcements());
     }
 
     // Signed-in routes.
-    if (phone == null || _accounts[phone] == null) {
+    if (email == null || _accounts[email] == null) {
       throw const _Reply(401, {'message': 'Unauthenticated.'});
     }
-    final account = Map<String, dynamic>.from(_accounts[phone] as Map);
-    _accounts[phone] = account;
+    final account = Map<String, dynamic>.from(_accounts[email] as Map);
+    _accounts[email] = account;
 
     switch (key) {
       case 'POST /auth/sign-out':
         _sessions.remove(auth.substring(7));
         return const _Reply(200, {'message': 'Signed out.'});
-      case 'POST /auth/mpin/change':
-        _checkMpin(account, '${body['currentMpin']}');
-        _rejectWeak('${body['mpin']}');
-        account['mpin'] = '${body['mpin']}';
+      case 'POST /auth/password/change':
+        _checkPassword(account, '${body['currentPassword']}');
+        account['password'] = _passwordOf(body, 'password', email);
         return const _Reply(200, {'ok': true});
       case 'GET /profile':
-        return _Reply(200, _profile(phone, account));
+        return _Reply(200, _profile(email, account));
       case 'POST /profile':
-        return _updateProfile(phone, account, body);
+        return _updateProfile(email, account, body);
       case 'GET /notifications':
         return _Reply(200, _notifications(account));
       case 'GET /application':
@@ -164,7 +158,7 @@ class DemoBackend extends http.BaseClient {
         });
       case 'POST /identity/verify':
         account['linked'] = true;
-        return _Reply(200, {'status': 'verified', 'profile': _profile(phone, account)});
+        return _Reply(200, {'status': 'verified', 'profile': _profile(email, account)});
       case 'GET /profile/corrections':
         return const _Reply(200, []);
       case 'POST /profile/corrections':
@@ -193,104 +187,41 @@ class DemoBackend extends http.BaseClient {
   // Sign-in (same rules and error codes as Mobile\AuthController)
   // ---------------------------------------------------------------------------
 
-  static const _purposes = {'register', 'login', 'reset_mpin'};
-
-  String _phoneOf(Map<String, dynamic> body) {
-    final phone = '${body['phone'] ?? ''}';
-    if (!RegExp(r'^9\d{9}$').hasMatch(phone)) {
-      throw _fail(422, 'invalid_phone', 'Please enter a valid mobile number.');
+  String _emailOf(Map<String, dynamic> body) {
+    final email = '${body['email'] ?? ''}'.trim().toLowerCase();
+    if (!RegExp(r'^[^@\s]+@[^@\s.]+(\.[^@\s.]+)+$').hasMatch(email)) {
+      throw _fail(422, 'invalid_email', 'Please enter a valid email address.');
     }
-    return phone;
+    return email;
   }
 
-  _Reply _sendCode(Map<String, dynamic> body) {
-    final phone = _phoneOf(body);
-    final purpose = '${body['purpose']}';
-    if (!_purposes.contains(purpose)) {
-      throw _fail(422, 'invalid_purpose', 'Please update the app.');
+  /// Length only, like the backend. Also refuses the obvious ones.
+  String _passwordOf(Map<String, dynamic> body, String key, String email) {
+    final password = '${body[key] ?? ''}';
+    if (password.length < _minPassword || password.length > 72) {
+      throw _fail(422, 'invalid_password',
+          'Please use a password of at least $_minPassword characters.');
     }
-    final exists = _accounts.containsKey(phone);
-    if (purpose == 'register' && exists) {
-      throw _fail(409, 'already_registered',
-          'This mobile number is already registered. Please log in instead.');
-    }
-    if (purpose != 'register' && !exists) {
-      throw _fail(404, 'account_not_found',
-          'Account not found. Please create an account first.');
-    }
-    _codes[phone] = {
-      'purpose': purpose,
-      'sentAt': DateTime.now().toIso8601String(),
-      'tries': 0,
+    const common = {
+      'password', 'password1', 'password123', '12345678', '123456789',
+      '1234567890', 'qwertyui', 'qwerty123', '11111111', '00000000',
+      'abc12345', 'iloveyou', 'senior123',
     };
-    // Demo: a short wait so "Resend OTP" can be tried quickly.
-    return const _Reply(200, {
-      'message': 'We sent a code to your phone.',
-      'expiresIn': 300,
-      'resendIn': 20,
-    });
+    final lower = password.toLowerCase();
+    if (lower == email || common.contains(lower)) {
+      throw _fail(422, 'weak_password', 'This password is too easy to guess.');
+    }
+    return password;
   }
 
-  _Reply _verifyCode(Map<String, dynamic> body) {
-    final phone = _phoneOf(body);
-    final sent = _codes[phone] as Map?;
-    if (sent == null ||
-        sent['purpose'] != '${body['purpose']}' ||
-        DateTime.now().difference(DateTime.parse('${sent['sentAt']}')) >
-            const Duration(minutes: 5)) {
-      throw _fail(422, 'expired', 'This code has expired. Please request a new code.');
-    }
-    var tries = sent['tries'] as int;
-    if (tries >= _maxCodeTries) {
-      throw _fail(429, 'too_many_attempts', 'Too many attempts.');
-    }
-    if ('${body['code']}' != kDemoOtp) {
-      tries++;
-      _codes[phone] = {...sent, 'tries': tries};
-      final left = _maxCodeTries - tries;
-      if (left <= 0) throw _fail(429, 'too_many_attempts', 'Too many attempts.');
-      throw _fail(422, 'wrong_code', 'That code is incorrect.',
-          {'attemptsLeft': left});
-    }
-    _codes.remove(phone);
-    final ticket = 'demo-ticket-${DateTime.now().microsecondsSinceEpoch}';
-    _tickets[ticket] = {'phone': phone, 'purpose': sent['purpose']};
-    return _Reply(200, {'verificationToken': ticket, 'expiresIn': 600});
-  }
-
-  void _redeem(Map<String, dynamic> body, String phone, String purpose) {
-    final ticket = _tickets['${body['verificationToken']}'] as Map?;
-    if (ticket == null ||
-        ticket['phone'] != phone ||
-        ticket['purpose'] != purpose) {
-      throw _fail(422, 'verification_expired',
-          'Your verification has expired. Please start again.');
-    }
-  }
-
-  void _rejectWeak(String mpin) {
-    if (!RegExp(r'^\d{4}$').hasMatch(mpin)) {
-      throw _fail(422, 'invalid_mpin', 'Please enter exactly 4 numbers.');
-    }
-    final d = mpin.codeUnits.map((c) => c - 48).toList();
-    var up = true, down = true;
-    for (var i = 1; i < d.length; i++) {
-      up = up && d[i] == d[i - 1] + 1;
-      down = down && d[i] == d[i - 1] - 1;
-    }
-    if (d.toSet().length == 1 || up || down || mpin == kDemoOtp) {
-      throw _fail(422, 'weak_mpin', 'This MPIN is too easy to guess.');
-    }
-  }
-
-  String _session(String phone) {
+  String _session(String email) {
     final token = 'demo-session-${DateTime.now().microsecondsSinceEpoch}';
-    _sessions[token] = phone;
+    _sessions[token] = email;
     return token;
   }
 
   _Reply _register(Map<String, dynamic> body) {
-    final phone = _phoneOf(body);
+    final email = _emailOf(body);
     String text(String k) => '${body[k] ?? ''}'.trim();
     final noMiddle = body['noMiddleName'] == true;
     final nameOk = RegExp(r"^[A-Za-zÑñ .'\-]+$");
@@ -299,16 +230,19 @@ class DemoBackend extends http.BaseClient {
         (noMiddle ? text('middleName').isNotEmpty : !nameOk.hasMatch(text('middleName')))) {
       throw _fail(422, 'invalid_name', 'Please check your name.');
     }
-    _redeem(body, phone, 'register');
-    _rejectWeak('${body['mpin']}');
-    if (_accounts.containsKey(phone)) {
+    final password = _passwordOf(body, 'password', email);
+    if (_accounts.containsKey(email)) {
       throw _fail(409, 'already_registered',
-          'This mobile number is already registered. Please log in instead.');
+          'This email address is already registered. Please log in instead.');
     }
-    _tickets.remove('${body['verificationToken']}');
-    _accounts[phone] = {
-      'mpin': '${body['mpin']}',
-      'mpinTries': 0,
+
+    _accounts[email] = {
+      'password': password,
+      'failedLogins': 0,
+      // DEMO: nothing can send an email or open a web page here, so the
+      // address counts as confirmed at once. The Check Your Inbox screen
+      // says so instead of waiting for a link that can never arrive.
+      'emailVerified': true,
       'firstName': text('firstName'),
       'middleName': noMiddle ? '' : text('middleName'),
       'lastName': text('lastName'),
@@ -321,85 +255,95 @@ class DemoBackend extends http.BaseClient {
       'createdAt': DateTime.now().toIso8601String(),
       'requests': <String, dynamic>{},
     };
+
     return _Reply(201, {
-      'token': _session(phone),
-      'deviceKey': _trustDevice(_accounts[phone] as Map<String, dynamic>),
+      'ok': true,
+      'email': email,
+      'verifyHours': 48,
+      'demoVerified': true,
+      'message': 'DEMO: no email is sent, so this address is already confirmed.',
     });
   }
 
-  /// Like Laravel: a verified code trusts the phone (MPIN-only login).
-  String _trustDevice(Map<String, dynamic> account) {
-    final key = 'demo-device-${DateTime.now().microsecondsSinceEpoch}';
-    final devices = [...(account['devices'] as List? ?? const []), key];
-    account['devices'] = devices.skip(devices.length > 3 ? devices.length - 3 : 0).toList();
-    return key;
-  }
-
-  void _checkMpin(Map<String, dynamic> account, String mpin) {
+  /// Wrong passwords count up; too many lock the account for a while.
+  void _checkPassword(Map<String, dynamic> account, String password) {
     final lockedUntil = DateTime.tryParse('${account['lockedUntil'] ?? ''}');
     if (lockedUntil != null && lockedUntil.isAfter(DateTime.now())) {
-      throw _fail(423, 'mpin_locked', 'Too many wrong MPIN tries.');
+      throw _fail(423, 'account_locked', 'Too many wrong passwords.', {
+        'retryAfter': lockedUntil.difference(DateTime.now()).inSeconds,
+      });
     }
-    if (account['mpin'] == mpin) {
-      account['mpinTries'] = 0;
+
+    if (password.isNotEmpty && password == account['password']) {
+      account['failedLogins'] = 0;
+      account['lockedUntil'] = null;
       return;
     }
-    final tries = (account['mpinTries'] as int? ?? 0) + 1;
-    if (tries >= _maxMpinTries) {
-      account['mpinTries'] = 0;
+
+    final tries = (account['failedLogins'] as int? ?? 0) + 1;
+    if (tries >= _maxPasswordTries) {
+      account['failedLogins'] = 0;
       account['lockedUntil'] =
-          DateTime.now().add(const Duration(minutes: 1)).toIso8601String();
-      throw _fail(423, 'mpin_locked', 'Too many wrong MPIN tries.');
+          DateTime.now().add(const Duration(minutes: 15)).toIso8601String();
+      throw _fail(423, 'account_locked', 'Too many wrong passwords.',
+          {'retryAfter': 15 * 60});
     }
-    account['mpinTries'] = tries;
-    throw _fail(422, 'wrong_mpin', 'Your MPIN is incorrect.',
-        {'attemptsLeft': _maxMpinTries - tries});
+    account['failedLogins'] = tries;
+
+    // The same answer as an address with no account, so neither can be
+    // told from the other.
+    throw _fail(422, 'invalid_credentials', 'Incorrect email or password.');
   }
 
   _Reply _login(Map<String, dynamic> body) {
-    final phone = _phoneOf(body);
-    final deviceKey = '${body['deviceKey'] ?? ''}';
-    if (deviceKey.isNotEmpty) {
-      final account = _accounts[phone] as Map<String, dynamic>?;
-      if (account == null) {
-        throw _fail(404, 'account_not_found', 'Account not found.');
-      }
-      if (!(account['devices'] as List? ?? const []).contains(deviceKey)) {
-        throw _fail(422, 'device_not_trusted',
-            'Please confirm this phone with a code first.');
-      }
-      _checkMpin(account, '${body['mpin']}');
-      return _Reply(200, {'token': _session(phone)});
-    }
-    _redeem(body, phone, 'login');
-    final account = _accounts[phone] as Map<String, dynamic>?;
+    final email = _emailOf(body);
+    final account = _accounts[email] as Map<String, dynamic>?;
     if (account == null) {
-      throw _fail(404, 'account_not_found', 'Account not found.');
+      throw _fail(422, 'invalid_credentials', 'Incorrect email or password.');
     }
-    _checkMpin(account, '${body['mpin']}');
-    _tickets.remove('${body['verificationToken']}');
+
+    _checkPassword(account, '${body['password'] ?? ''}');
+    _accounts[email] = account;
+
+    if (account['emailVerified'] != true) {
+      throw _fail(403, 'email_not_verified',
+          'Please confirm your email address first.', {'email': email});
+    }
+
     return _Reply(200, {
-      'token': _session(phone),
-      'deviceKey': _trustDevice(account),
+      'token': _session(email),
+      'account': _profile(email, account),
     });
   }
 
-  _Reply _resetMpin(Map<String, dynamic> body) {
-    final phone = _phoneOf(body);
-    _redeem(body, phone, 'reset_mpin');
-    final account = _accounts[phone] as Map<String, dynamic>?;
+  _Reply _resendVerification(Map<String, dynamic> body) {
+    final email = _emailOf(body);
+    final account = _accounts[email] as Map<String, dynamic>?;
     if (account == null) {
-      throw _fail(404, 'account_not_found', 'Account not found.');
+      throw _fail(422, 'invalid_credentials', 'Incorrect email or password.');
     }
-    _rejectWeak('${body['mpin']}');
-    account
-      ..['mpin'] = '${body['mpin']}'
-      ..['mpinTries'] = 0
-      ..remove('lockedUntil')
-      ..remove('devices');
-    _tickets.remove('${body['verificationToken']}');
-    _sessions.removeWhere((_, p) => p == phone);
-    return _Reply(200, {'ok': true, 'deviceKey': _trustDevice(account)});
+
+    _checkPassword(account, '${body['password'] ?? ''}');
+    _accounts[email] = account;
+
+    return _Reply(200, {
+      'ok': true,
+      'alreadyVerified': account['emailVerified'] == true,
+      'verifyHours': 48,
+    });
+  }
+
+  /// Always ok, like the backend, so it never says who has an account.
+  /// DEMO: no link can be sent, so there is nothing to tap; the password
+  /// stays as it is.
+  _Reply _forgotPassword(Map<String, dynamic> body) {
+    _emailOf(body);
+
+    return const _Reply(200, {
+      'ok': true,
+      'expiresInMinutes': 30,
+      'message': 'DEMO: no email is sent, so no reset link arrives.',
+    });
   }
 
   // ---------------------------------------------------------------------------
@@ -413,9 +357,12 @@ class DemoBackend extends http.BaseClient {
         a['suffix'],
       ].map((s) => '${s ?? ''}'.trim()).where((s) => s.isNotEmpty).join(' ');
 
-  Map<String, dynamic> _profile(String phone, Map<String, dynamic> a) => {
-        'phone': phone,
-        'mobile': phone,
+  Map<String, dynamic> _profile(String email, Map<String, dynamic> a) => {
+        'email': email,
+        // Contact information the senior can set in Account; empty until
+        // they do, since signing up no longer asks for a number.
+        'phone': a['phone'] ?? '',
+        'mobile': a['phone'] ?? '',
         'fullName': _fullName(a),
         'firstName': a['firstName'] ?? '',
         'middleName': a['middleName'] ?? '',
@@ -435,7 +382,7 @@ class DemoBackend extends http.BaseClient {
       };
 
   _Reply _updateProfile(
-      String phone, Map<String, dynamic> a, Map<String, dynamic> body) {
+      String email, Map<String, dynamic> a, Map<String, dynamic> body) {
     for (final k in [
       'firstName',
       'middleName',
@@ -445,12 +392,14 @@ class DemoBackend extends http.BaseClient {
       'barangay',
       'municipality',
       'province',
+      // Contact information now, not a credential.
+      'phone',
     ]) {
       if (body.containsKey(k) && body[k] != null) a[k] = body[k];
     }
     final birth = '${body['birthDate'] ?? ''}';
     if (birth.length >= 10) a['birthDate'] = birth.substring(0, 10);
-    return _Reply(200, {'ok': true, 'profile': _profile(phone, a)});
+    return _Reply(200, {'ok': true, 'profile': _profile(email, a)});
   }
 
   // ---------------------------------------------------------------------------

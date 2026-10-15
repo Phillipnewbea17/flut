@@ -41,7 +41,13 @@ extension UserApplicationStatusInfo on UserApplicationStatus {
 enum RecordSource { application, linked }
 
 class UserProfile {
-  final String phone; // digits only, no country code, e.g. 9551402068
+  /// What the account signs in with. The OSCA office identifies an app
+  /// account by this address.
+  final String email;
+
+  /// Contact number, digits only, no country code, e.g. 9551402068. Optional
+  /// since the app moved from text messages to email.
+  final String phone;
   final String fullName;
   final UserRole role;
   final DateTime? birthDate;
@@ -74,7 +80,8 @@ class UserProfile {
   final String? photoPath;
 
   const UserProfile({
-    required this.phone,
+    this.email = '',
+    this.phone = '',
     required this.fullName,
     required this.role,
     this.birthDate,
@@ -151,6 +158,7 @@ class UserProfile {
   }
 
   UserProfile copyWith({
+    String? email,
     String? phone,
     String? fullName,
     UserRole? role,
@@ -170,6 +178,7 @@ class UserProfile {
     String? Function()? photoPath,
   }) {
     return UserProfile(
+      email: email ?? this.email,
       phone: phone ?? this.phone,
       fullName: fullName ?? this.fullName,
       role: role ?? this.role,
@@ -191,6 +200,7 @@ class UserProfile {
   }
 
   Map<String, dynamic> toJson() => {
+        'email': email,
         'phone': phone,
         'fullName': fullName,
         'role': role.name,
@@ -213,6 +223,7 @@ class UserProfile {
   factory UserProfile.fromJson(Map<String, dynamic> json) {
     final record = json['oscaRecord'];
     return UserProfile(
+      email: json['email'] as String? ?? '',
       phone: json['phone'] as String? ?? '',
       fullName: json['fullName'] as String? ?? '',
       role: UserRole.values.firstWhere(

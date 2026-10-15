@@ -1,208 +1,151 @@
-import 'package:my_senior_app/models/onboarding_stage.dart';
 import 'package:my_senior_app/models/registration_name.dart';
 import 'package:my_senior_app/services/auth_service.dart';
+import 'package:my_senior_app/storage/auth_storage.dart';
 
-/// Test-only stand-in for the SCMS backend's sign-in rules. Each test sets
-/// the code the "server" sent with [nextCode]; there is no fixed code.
+/// Test-only stand-in for the SCMS backend's sign-in rules: an email
+/// address and a password, with the address confirmed by a link.
+///
+/// Nothing here sends mail. [verify] stands in for the senior tapping the
+/// link in their inbox, and [sentVerifications] counts the emails the real
+/// backend would have sent.
 class FakeAuthBackend implements AuthService {
-  FakeAuthBackend({
-    Map<String, String>? mpins,
-    this.ticket = const OtpTicket(),
-  }) : mpins = mpins ?? {};
+  FakeAuthBackend({Map<String, String>? passwords})
+      : passwords = passwords ?? {};
 
-  /// Registered accounts: phone -> MPIN.
-  final Map<String, String> mpins;
+  /// Registered accounts: email -> password. An account put here directly
+  /// counts as confirmed, so a test can start from "already signed up".
+  final Map<String, String> passwords;
 
-  OtpTicket ticket;
+  /// Registered accounts: email -> name sent with Sign up.
+  final Map<String, RegistrationName> names = {};
 
-  /// The code the next [requestOtp] "texts" to the phone.
-  String nextCode = '';
+  /// Addresses still waiting for their link to be tapped.
+  final Set<String> unverified = {};
 
-  /// Wrong codes the server allows per code.
-  int maxCodeAttempts = 5;
+  /// How many confirmation emails the backend would have sent, per address.
+  final Map<String, int> sentVerifications = {};
 
-  /// Wrong MPINs the server allows before locking.
-  int maxMpinAttempts = 3;
+  /// How many reset links the backend would have sent, per address.
+  final Map<String, int> sentResetLinks = {};
+
+  /// Wrong passwords the server allows before locking the account.
+  int maxPasswordAttempts = 3;
 
   /// What [checkSession] answers when a session exists.
   SessionStatus sessionStatus = SessionStatus.valid;
 
-  String? sessionPhone;
+  String? sessionEmail;
   final List<String> calls = [];
 
-  String? _code;
-  String? _codePhone;
-  AuthFlow? _codeFlow;
-  int _wrongCodes = 0;
-  bool codeExpired = false;
-  final Map<String, AuthFlow> _verified = {};
-  int _wrongMpins = 0;
+  int _wrongPasswords = 0;
   int _tokens = 0;
 
-  @override
-  Future<OtpTicket> requestOtp({
-    required String phone,
-    required AuthFlow flow,
-  }) async {
-    calls.add('code:${flow.wireName}');
-    final exists = mpins.containsKey(phone);
-    if (flow == AuthFlow.register && exists) {
-      throw const AuthException(AuthError.alreadyRegistered);
-    }
-    if (flow != AuthFlow.register && !exists) {
-      throw const AuthException(AuthError.accountNotFound);
-    }
-    _code = nextCode;
-    _codePhone = phone;
-    _codeFlow = flow;
-    _wrongCodes = 0;
-    codeExpired = false;
-    return ticket;
-  }
-
-  @override
-  Future<String> verifyOtp({
-    required String phone,
-    required String code,
-    required AuthFlow flow,
-  }) async {
-    calls.add('verify');
-    if (_code == null || phone != _codePhone || flow != _codeFlow) {
-      throw const AuthException(AuthError.codeExpired);
-    }
-    if (codeExpired) throw const AuthException(AuthError.codeExpired);
-    if (_wrongCodes >= maxCodeAttempts) {
-      throw const AuthException(AuthError.tooManyAttempts);
-    }
-    if (code != _code) {
-      _wrongCodes++;
-      throw AuthException(AuthError.wrongCode,
-          attemptsLeft: maxCodeAttempts - _wrongCodes);
-    }
-    _code = null;
-    final token = 'verify-${++_tokens}';
-    _verified[token] = flow;
-    return token;
-  }
-
-  void _useVerification(String token, AuthFlow flow) {
-    if (_verified.remove(token) != flow) {
-      throw const AuthException(AuthError.verificationExpired);
-    }
-  }
-
-  /// Registered accounts: phone -> name sent with Create Account.
-  final Map<String, RegistrationName> names = {};
+  /// Stands in for the senior tapping the link in the confirmation email.
+  void verify(String email) => unverified.remove(email);
 
   @override
   Future<void> register({
     required RegistrationName name,
-    required String phone,
-    required String verificationToken,
-    required String mpin,
+    required String email,
+    required String password,
   }) async {
     calls.add('register');
-    _useVerification(verificationToken, AuthFlow.register);
-    if (mpins.containsKey(phone)) {
+    if (passwords.containsKey(email)) {
       throw const AuthException(AuthError.alreadyRegistered);
     }
-    mpins[phone] = mpin;
-    names[phone] = name;
-    sessionPhone = phone;
+    passwords[email] = password;
+    names[email] = name;
+    // A new account has to confirm its address before it can log in.
+    unverified.add(email);
+    sentVerifications[email] = (sentVerifications[email] ?? 0) + 1;
   }
 
   @override
   Future<void> login({
-    required String phone,
-    required String verificationToken,
-    required String mpin,
+    required String email,
+    required String password,
   }) async {
     calls.add('login');
-    if (_wrongMpins >= maxMpinAttempts) {
-      throw const AuthException(AuthError.mpinLocked);
+    if (_wrongPasswords >= maxPasswordAttempts) {
+      throw const AuthException(AuthError.accountLocked);
     }
-    if (!_verified.containsKey(verificationToken)) {
-      throw const AuthException(AuthError.verificationExpired);
+    // A wrong address and a wrong password answer alike, so neither can be
+    // told from the other.
+    if (!passwords.containsKey(email)) {
+      throw const AuthException(AuthError.invalidCredentials);
     }
-    if (mpins[phone] != mpin) {
-      _wrongMpins++;
-      if (_wrongMpins >= maxMpinAttempts) {
-        throw const AuthException(AuthError.mpinLocked);
+    if (passwords[email] != password) {
+      _wrongPasswords++;
+      if (_wrongPasswords >= maxPasswordAttempts) {
+        throw const AuthException(AuthError.accountLocked);
       }
-      throw AuthException(AuthError.wrongMpin,
-          attemptsLeft: maxMpinAttempts - _wrongMpins);
+      throw const AuthException(AuthError.invalidCredentials);
     }
-    _useVerification(verificationToken, AuthFlow.login);
-    _wrongMpins = 0;
-    sessionPhone = phone;
+    if (unverified.contains(email)) {
+      throw AuthException(AuthError.emailNotVerified, email: email);
+    }
+    _wrongPasswords = 0;
+    sessionEmail = email;
+    // Like ApiAuthService: the token goes to AuthStorage, so a restart can
+    // find it and SessionProvider can decide whether to open Home.
+    await const AuthStorage().saveToken('fake|${++_tokens}');
   }
 
-  /// True when this phone verified a code before, so the real backend
-  /// would have given it a device key: logging in needs only the MPIN.
-  /// Off by default, so every login asks for a code.
-  bool trustsThisPhone = false;
-
   @override
-  Future<String?> trustedPhone() async =>
-      trustsThisPhone ? sessionPhone ?? _codePhone : null;
-
-  @override
-  Future<void> loginOnTrustedPhone({
-    required String phone,
-    required String mpin,
+  Future<bool> resendVerification({
+    required String email,
+    required String password,
   }) async {
-    calls.add('login-trusted');
-    if (!trustsThisPhone) {
-      throw const AuthException(AuthError.deviceNotTrusted);
+    calls.add('resend');
+    if (passwords[email] != password) {
+      throw const AuthException(AuthError.invalidCredentials);
     }
-    if (_wrongMpins >= maxMpinAttempts) {
-      throw const AuthException(AuthError.mpinLocked);
-    }
-    if (mpins[phone] != mpin) {
-      _wrongMpins++;
-      if (_wrongMpins >= maxMpinAttempts) {
-        throw const AuthException(AuthError.mpinLocked);
-      }
-      throw AuthException(AuthError.wrongMpin,
-          attemptsLeft: maxMpinAttempts - _wrongMpins);
-    }
-    _wrongMpins = 0;
-    sessionPhone = phone;
+    if (!unverified.contains(email)) return true;
+    sentVerifications[email] = (sentVerifications[email] ?? 0) + 1;
+    return false;
   }
 
   @override
-  Future<void> resetMpin({
-    required String phone,
-    required String verificationToken,
-    required String mpin,
-  }) async {
-    calls.add('reset');
-    _useVerification(verificationToken, AuthFlow.resetMpin);
-    mpins[phone] = mpin;
-    _wrongMpins = 0;
+  Future<void> forgotPassword({required String email}) async {
+    calls.add('forgot');
+    // The real backend answers the same whether or not the address has an
+    // account, so this never throws for an unknown one.
+    if (passwords.containsKey(email)) {
+      sentResetLinks[email] = (sentResetLinks[email] ?? 0) + 1;
+    }
   }
 
   @override
-  Future<void> changeMpin({
-    required String currentMpin,
-    required String mpin,
+  Future<void> changePassword({
+    required String currentPassword,
+    required String password,
   }) async {
     calls.add('change');
-    final phone = sessionPhone;
-    if (phone == null) throw const AuthException(AuthError.sessionExpired);
-    if (mpins[phone] != currentMpin) {
-      throw const AuthException(AuthError.wrongMpin);
+    final email = sessionEmail;
+    if (email == null) throw const AuthException(AuthError.sessionExpired);
+    if (passwords[email] != currentPassword) {
+      throw const AuthException(AuthError.invalidCredentials);
     }
-    mpins[phone] = mpin;
+    passwords[email] = password;
   }
 
   @override
-  Future<SessionStatus> checkSession() async =>
-      sessionPhone == null ? SessionStatus.none : sessionStatus;
+  Future<SessionStatus> checkSession() async {
+    // Like ApiAuthService: no token on the phone means no session at all,
+    // and a token the server refuses is forgotten here too.
+    if (await const AuthStorage().readToken() == null) {
+      return SessionStatus.none;
+    }
+    if (sessionStatus == SessionStatus.expired) {
+      await const AuthStorage().deleteToken();
+    }
+    return sessionStatus;
+  }
 
   @override
   Future<void> signOut() async {
     calls.add('sign-out');
-    sessionPhone = null;
+    sessionEmail = null;
+    await const AuthStorage().deleteToken();
   }
 }

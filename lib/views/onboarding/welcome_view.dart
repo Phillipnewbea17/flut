@@ -7,7 +7,7 @@ import '../../theme/app_colors.dart';
 import '../../widgets/big_button.dart';
 import '../../widgets/onboarding_scaffold.dart';
 
-/// The first screen for anyone not signed in: Create Account or Login.
+/// The first screen for anyone not signed in: Sign Up or Login.
 class WelcomeView extends StatelessWidget {
   const WelcomeView({super.key});
 
@@ -65,7 +65,7 @@ class WelcomeView extends StatelessWidget {
                       children: [
                         const SizedBox(height: 40),
                         BigButton(
-                          label: 'Create Account',
+                          label: 'Sign Up',
                           icon: Icons.person_add_alt_1_outlined,
                           onPressed: () => context.go(Routes.register),
                         ),

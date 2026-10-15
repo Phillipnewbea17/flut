@@ -77,7 +77,7 @@ Future<GoRouter> _startApp(WidgetTester tester, {double textScale = 1}) async {
     // Signed in and linked: a session the backend accepts.
     await prefs.setStage(OnboardingStage.completed);
     await const AuthStorage().saveToken('1|test');
-    final backend = FakeAuthBackend()..sessionPhone = '9171234567';
+    final backend = FakeAuthBackend()..sessionEmail = 'ana@example.com';
     final session = SessionProvider(
         prefs: prefs, storage: const AuthStorage(), auth: backend);
     await session.init();

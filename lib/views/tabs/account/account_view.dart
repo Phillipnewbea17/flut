@@ -26,7 +26,7 @@ class AccountView extends StatelessWidget {
         title: const Text('Log out?', style: TextStyle(fontSize: 22)),
         content: const Text(
           'Your information and photos will be removed from this phone. '
-          'You can log in again with your phone number.',
+          'You can log in again with your email address.',
           style: TextStyle(fontSize: 15, height: 1.4),
         ),
         actions: [
@@ -104,7 +104,7 @@ class AccountView extends StatelessWidget {
                               ),
                             ),
                             Text(
-                              profile?.displayPhone ?? '',
+                              profile?.email ?? '',
                               style: const TextStyle(
                                 fontSize: 14,
                                 color: AppColors.textSecondary,
@@ -157,8 +157,8 @@ class AccountView extends StatelessWidget {
                   items: [
                     _item(context, Icons.text_fields, 'accountAccessibility',
                         Routes.accessibility),
-                    _item(context, Icons.lock_outline, 'accountChangeMpin',
-                        Routes.changeMpin),
+                    _item(context, Icons.lock_outline, 'accountChangePassword',
+                        Routes.changePassword),
                   ],
                 ),
                 MenuGroup(

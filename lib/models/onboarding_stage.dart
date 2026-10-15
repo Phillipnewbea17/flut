@@ -2,20 +2,16 @@
 /// The router reads this (with [AuthFlow]) to decide which screen to show.
 ///
 /// Only [signedOut], [identitySetup] and [completed] are saved on the phone.
-/// The others last only while the app is open: the code, the verification
-/// token and the typed MPIN are never saved, so after a restart the steps
-/// start again.
+/// The others last only while the app is open: the typed password is never
+/// saved, so after a restart the steps start again.
 ///
-/// A restart on a phone that already has the account does not start any
-/// flow again: AuthStorage says it is registered and the splash opens
-/// [mpinEntry] (Login, "Enter your MPIN") straight away.
+/// A restart on a phone that already has an account goes to Login with the
+/// address filled in (AuthStorage remembers it); the session token decides
+/// whether even that is needed.
 enum OnboardingStage {
-  signedOut, // Welcome, Create Account name, Login or Forgot MPIN number
-  phoneEntry, // Create Account: mobile number (after the name)
-  otpVerify, // "Enter the 4-digit code"
-  mpinSetup, // create a new MPIN (Create Account or Forgot MPIN)
-  mpinConfirm, // type the new MPIN again
-  mpinEntry, // Login: "Enter your MPIN"
+  signedOut, // Welcome, Sign up name, Login, Forgot password
+  credentials, // Sign up: email address, password, confirm password
+  checkInbox, // "Check your inbox" until the address is confirmed
   identitySetup, // linking the senior citizen record (outside sign-in)
   completed; // signed in: the tabs
 
@@ -42,34 +38,28 @@ enum OnboardingStage {
 }
 
 /// Which sign-in flow the screens belong to. Each has its own business
-/// logic (RegistrationFlow, LoginFlow, MpinResetFlow); only the code (OTP)
-/// step and the session are shared.
+/// logic, so Sign up and Login never share any:
 ///
-/// - register:  name -> mobile -> code -> create + confirm MPIN -> Home
-/// - login:     mobile -> code -> enter MPIN -> Home
-/// - resetMpin: mobile -> code -> new MPIN + confirm -> Login
+/// - register:       name -> email + password + confirm -> check your inbox
+/// - login:          email + password -> Home
+/// - forgotPassword: email -> (link in the inbox) -> back to Login
+///
+/// Nothing is typed from an email any more: both the confirmation and the
+/// password reset are links the senior taps, and the pages they open are
+/// served by the backend.
 enum AuthFlow {
   register,
   login,
-  resetMpin;
+  forgotPassword;
 
-  /// The value sent to the backend as "purpose".
-  String get wireName => switch (this) {
-        AuthFlow.register => 'register',
-        AuthFlow.login => 'login',
-        AuthFlow.resetMpin => 'reset_mpin',
-      };
+  static const int registerSteps = 2;
 
-  static const int registerSteps = 4;
-
-  /// "Step 2 of 4" on the Create Account screens, null otherwise.
+  /// "Step 2 of 2" on the Sign up screens, null otherwise.
   String? stepLabel(OnboardingStage stage) {
     if (this != AuthFlow.register) return null;
     final n = switch (stage) {
       OnboardingStage.signedOut => 1,
-      OnboardingStage.phoneEntry => 2,
-      OnboardingStage.otpVerify => 3,
-      OnboardingStage.mpinSetup || OnboardingStage.mpinConfirm => 4,
+      OnboardingStage.credentials => 2,
       _ => null,
     };
     return n == null ? null : 'Step $n of $registerSteps';

@@ -24,14 +24,24 @@ class FaqView extends StatelessWidget {
           'app when your application is checked and when your ID is ready.',
     ),
     (
-      'What is the MPIN?',
-      'The 4 numbers you type to open this app. It keeps your information '
-          'safe if someone else uses your phone. Do not share it with anyone.',
+      'What password should I use?',
+      'Any password of at least 8 characters. A few short words together, '
+          'like "bahay sa ubay", is easy to remember and hard to guess. Do '
+          'not share it with anyone.',
     ),
     (
-      'I forgot my MPIN. What do I do?',
-      'On the MPIN screen, tap "Forgot MPIN?". You will log in again with '
-          'your phone number and make a new MPIN.',
+      'I forgot my password. What do I do?',
+      'On the login screen, tap "Forgot password?" and enter your email '
+          'address. We will email you a link. Open the email, tap "Set a new '
+          'password", then come back and log in. The link works for 30 '
+          'minutes.',
+    ),
+    (
+      'Why do I have to confirm my email?',
+      'It makes sure the address is really yours, so nobody else can use it '
+          'and so we can reach you about your password. After you sign up, '
+          'open our email and tap "Confirm my email". If it is not there, '
+          'look in your Spam or Junk folder.',
     ),
     (
       'Can my family help me?',

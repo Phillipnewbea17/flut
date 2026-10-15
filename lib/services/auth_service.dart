@@ -1,4 +1,3 @@
-import '../models/onboarding_stage.dart';
 import '../models/registration_name.dart';
 import '../storage/auth_storage.dart';
 import 'api_client.dart';
@@ -6,21 +5,24 @@ import 'api_client.dart';
 /// Why a sign-in step failed. Each one has its own plain-words message.
 enum AuthError {
   invalidName,
-  invalidPhone,
+  invalidEmail,
+  invalidPassword,
+  weakPassword,
+  passwordMismatch,
   alreadyRegistered,
-  accountNotFound,
-  wrongCode,
-  codeExpired,
-  tooManyAttempts,
-  tooManyRequests,
-  verificationExpired,
-  deviceNotTrusted,
-  wrongMpin,
-  mpinLocked,
-  weakMpin,
-  mpinMismatch,
+
+  /// A wrong address and a wrong password both land here: the backend will
+  /// not say which, so nobody can use Login to find out who has an account.
+  invalidCredentials,
+
+  /// The account exists and the password was right, but the address has not
+  /// been confirmed yet. The app offers to send the email again.
+  emailNotVerified,
+
+  accountLocked,
+  accountDeactivated,
   sessionExpired,
-  smsFailed,
+  emailFailed,
   unavailable,
   network,
   server,
@@ -33,80 +35,51 @@ enum AuthError {
 class AuthException implements Exception {
   final AuthError error;
 
-  /// Tries left, when the backend says (wrong code, wrong MPIN).
-  final int? attemptsLeft;
-
-  /// How long to wait before asking again, when the backend says.
+  /// How long to wait before trying again, when the backend says.
   final Duration? retryAfter;
 
-  const AuthException(this.error, {this.attemptsLeft, this.retryAfter});
+  /// The address the backend is talking about, when it says so (an
+  /// unconfirmed account).
+  final String? email;
 
-  String get message {
-    final left = attemptsLeft;
-    final tries = left == null || left <= 0
-        ? ''
-        : ' You have $left ${left == 1 ? 'try' : 'tries'} left.';
-    return switch (error) {
-      AuthError.invalidName =>
-        'Please check your name. Use letters only.',
-      AuthError.invalidPhone =>
-        'Please enter your 10-digit mobile number. It starts with 9.',
-      AuthError.alreadyRegistered =>
-        'This mobile number is already registered. Please log in instead.',
-      AuthError.accountNotFound =>
-        'Account not found. Please create an account first.',
-      AuthError.wrongCode => 'That code is incorrect. Please try again.$tries',
-      AuthError.codeExpired =>
-        'This code has expired. Please request a new code.',
-      AuthError.tooManyAttempts =>
-        'Too many attempts. Please request a new code or try again later.',
-      AuthError.tooManyRequests =>
-        'Please wait a moment before asking for a new code.',
-      AuthError.verificationExpired =>
-        'Your verification has expired. Please start again.',
-      AuthError.deviceNotTrusted =>
-        'Please confirm this phone with the code we texted you.',
-      AuthError.wrongMpin => 'Your MPIN is incorrect. Please try again.$tries',
-      AuthError.mpinLocked => 'Too many wrong MPIN tries. Please use '
-          '"Forgot MPIN" or try again later.',
-      AuthError.weakMpin =>
-        'This MPIN is too easy to guess. Please choose different numbers.',
-      AuthError.mpinMismatch =>
-        'The MPINs do not match. Please try again.',
-      AuthError.sessionExpired =>
-        'Your session has ended. Please log in again.',
-      AuthError.smsFailed =>
-        'We could not send the code right now. Please try again later.',
-      AuthError.unavailable => 'Signing in is not available right now. '
-          'Please contact the OSCA office for help.',
-      AuthError.network =>
-        'Could not connect. Please check your internet and try again.',
-      AuthError.server =>
-        'Something went wrong on our side. Please try again later.',
-      AuthError.unknown => "We couldn't verify your information. Please "
-          'check your details and try again.',
-    };
-  }
+  const AuthException(this.error, {this.retryAfter, this.email});
+
+  String get message => switch (error) {
+        AuthError.invalidName => 'Please check your name. Use letters only.',
+        AuthError.invalidEmail =>
+          'Please enter your email address, like rosela@gmail.com.',
+        AuthError.invalidPassword =>
+          'Please use a password of at least 8 characters.',
+        AuthError.weakPassword =>
+          'This password is too easy to guess. Please choose another one.',
+        AuthError.passwordMismatch =>
+          'The passwords do not match. Please type them again.',
+        AuthError.alreadyRegistered =>
+          'This email address is already registered. Please log in instead.',
+        AuthError.invalidCredentials => 'Incorrect email or password.',
+        AuthError.emailNotVerified =>
+          'Please confirm your email address first. Check your inbox for '
+              'our email.',
+        AuthError.accountLocked => 'Too many wrong passwords. Please use '
+            '"Forgot password?" or try again later.',
+        AuthError.accountDeactivated =>
+          'This account has been deactivated. Please contact the OSCA office.',
+        AuthError.sessionExpired =>
+          'Your session has ended. Please log in again.',
+        AuthError.emailFailed =>
+          'We could not send the email right now. Please try again later.',
+        AuthError.unavailable => 'Signing in is not available right now. '
+            'Please contact the OSCA office for help.',
+        AuthError.network =>
+          'Could not connect. Please check your internet and try again.',
+        AuthError.server =>
+          'Something went wrong on our side. Please try again later.',
+        AuthError.unknown => "We couldn't verify your information. Please "
+            'check your details and try again.',
+      };
 
   @override
   String toString() => message;
-}
-
-/// What the backend says after a code was sent.
-class OtpTicket {
-  /// How long the code works.
-  final Duration expiresIn;
-
-  /// How long before another code may be asked for.
-  final Duration resendIn;
-
-  const OtpTicket({
-    this.expiresIn = defaultExpiry,
-    this.resendIn = defaultResend,
-  });
-
-  static const Duration defaultExpiry = Duration(minutes: 5);
-  static const Duration defaultResend = Duration(seconds: 60);
 }
 
 /// Is the saved session still good?
@@ -125,69 +98,49 @@ enum SessionStatus {
   offline,
 }
 
-/// Signing in through the SCMS backend.
+/// Signing in through the SCMS backend: an email address and a password,
+/// with the address confirmed by tapping a link in the inbox.
 ///
-/// The one-time code (OTP) proves the user has the phone. The MPIN proves
-/// it is the account owner. They are separate: a verified code only gives a
-/// short-lived [verificationToken] that is good for ONE next step (create
-/// the account, log in, or reset the MPIN), together with the MPIN.
+/// The password is sent to the backend only (over HTTPS), which stores it
+/// as a bcrypt hash. It is never saved on the phone and never written to
+/// any log.
 ///
-/// The MPIN is sent to the backend only (over HTTPS), which stores it
-/// hashed. It is never saved on the phone or written to any log.
-///
-/// A verified code also makes this phone trusted: the backend returns a
-/// device key, kept by AuthStorage, and logging in again on this phone
-/// needs only the MPIN ([loginOnTrustedPhone]). So a code is texted only for
-/// Create Account, a new phone, and Forgot MPIN.
+/// Nothing is ever typed out of an email. [register] and [forgotPassword]
+/// ask the backend to send a link; the page it opens is served by the
+/// backend, not by this app.
 abstract class AuthService {
-  /// Asks the backend to text a 4-digit code to [phone] (10 digits, no +63).
-  /// For [AuthFlow.register] the backend refuses a number that already has
-  /// an account; for login and reset it refuses an unknown number.
-  Future<OtpTicket> requestOtp({required String phone, required AuthFlow flow});
-
-  /// Checks [code]. Returns the verification token for the next step.
-  Future<String> verifyOtp({
-    required String phone,
-    required String code,
-    required AuthFlow flow,
-  });
-
-  /// Creates the account with its name and MPIN, and signs in.
+  /// Creates the account and asks the backend to email a confirmation
+  /// link. Does NOT sign in: the address has to be confirmed first.
   Future<void> register({
     required RegistrationName name,
-    required String phone,
-    required String verificationToken,
-    required String mpin,
+    required String email,
+    required String password,
   });
 
-  /// Signs in an existing account with its MPIN.
-  Future<void> login({
-    required String phone,
-    required String verificationToken,
-    required String mpin,
+  /// Signs in. Throws [AuthError.emailNotVerified] when the address has
+  /// not been confirmed yet, and [AuthError.invalidCredentials] for both a
+  /// wrong address and a wrong password.
+  Future<void> login({required String email, required String password});
+
+  /// Sends the confirmation email again. The password is needed so only
+  /// the account's owner can ask for it. Returns true when the address
+  /// turned out to be confirmed already.
+  Future<bool> resendVerification({
+    required String email,
+    required String password,
   });
 
-  /// The number this phone already proved with a code, or null.
-  Future<String?> trustedPhone();
+  /// Forgot password: asks the backend to email a single-use link. Returns
+  /// normally whether or not the address has an account, so this can never
+  /// be used to find out who has registered.
+  Future<void> forgotPassword({required String email});
 
-  /// Signs in on a trusted phone with the MPIN only (no code). Throws
-  /// AuthError.deviceNotTrusted when the backend no longer trusts this
-  /// phone (e.g. the MPIN was reset on another phone); the device key is
-  /// then forgotten and a code is needed.
-  Future<void> loginOnTrustedPhone({
-    required String phone,
-    required String mpin,
+  /// Changes the password of the signed-in account (Account > Change
+  /// Password).
+  Future<void> changePassword({
+    required String currentPassword,
+    required String password,
   });
-
-  /// Sets a new MPIN (Forgot MPIN). Does NOT sign in.
-  Future<void> resetMpin({
-    required String phone,
-    required String verificationToken,
-    required String mpin,
-  });
-
-  /// Changes the MPIN of the signed-in account (Account > Change MPIN).
-  Future<void> changeMpin({required String currentMpin, required String mpin});
 
   /// Asks the backend whether the saved session is still good.
   Future<SessionStatus> checkSession();
@@ -206,132 +159,55 @@ class ApiAuthService implements AuthService {
   final AuthStorage _storage;
 
   @override
-  Future<OtpTicket> requestOtp({
-    required String phone,
-    required AuthFlow flow,
-  }) async {
-    final data = await _call(
-        () => _api.post('/auth/code', {'phone': phone, 'purpose': flow.wireName}));
-    return OtpTicket(
-      expiresIn: _seconds(data['expiresIn']) ?? OtpTicket.defaultExpiry,
-      resendIn: _seconds(data['resendIn']) ?? OtpTicket.defaultResend,
-    );
-  }
-
-  @override
-  Future<String> verifyOtp({
-    required String phone,
-    required String code,
-    required AuthFlow flow,
-  }) async {
-    final data = await _call(() => _api.post('/auth/verify', {
-          'phone': phone,
-          'code': code,
-          'purpose': flow.wireName,
-        }));
-    final token = data['verificationToken'];
-    // An older backend signs in with the code alone (no MPIN). That is not
-    // allowed any more, so it is treated as "not available".
-    if (token is! String || token.isEmpty) {
-      throw const AuthException(AuthError.unavailable);
-    }
-    return token;
-  }
-
-  @override
   Future<void> register({
     required RegistrationName name,
-    required String phone,
-    required String verificationToken,
-    required String mpin,
+    required String email,
+    required String password,
   }) async {
-    final data = await _call(() => _api.post('/auth/register', {
+    await _call(() => _api.post('/auth/register', {
           ...name.toJson(),
-          'phone': phone,
-          'verificationToken': verificationToken,
-          'mpin': mpin,
+          'email': email,
+          'password': password,
         }));
-    await _saveSession(data);
-    await _saveDevice(phone, data);
   }
 
   @override
   Future<void> login({
-    required String phone,
-    required String verificationToken,
-    required String mpin,
+    required String email,
+    required String password,
   }) async {
     final data = await _call(() => _api.post('/auth/login', {
-          'phone': phone,
-          'verificationToken': verificationToken,
-          'mpin': mpin,
+          'email': email,
+          'password': password,
         }));
     await _saveSession(data);
-    await _saveDevice(phone, data);
   }
 
   @override
-  Future<String?> trustedPhone() async {
-    try {
-      return (await _storage.readDevice())?.$1;
-    } catch (_) {
-      return null; // Secure storage unreadable: confirm with a code.
-    }
-  }
-
-  @override
-  Future<void> loginOnTrustedPhone({
-    required String phone,
-    required String mpin,
+  Future<bool> resendVerification({
+    required String email,
+    required String password,
   }) async {
-    (String, String)? device;
-    try {
-      device = await _storage.readDevice();
-    } catch (_) {}
-    if (device == null || device.$1 != phone) {
-      throw const AuthException(AuthError.deviceNotTrusted);
-    }
-    final key = device.$2;
-    try {
-      final data = await _call(() => _api.post('/auth/login', {
-            'phone': phone,
-            'deviceKey': key,
-            'mpin': mpin,
-          }));
-      await _saveSession(data);
-    } on AuthException catch (e) {
-      if (e.error == AuthError.deviceNotTrusted ||
-          e.error == AuthError.accountNotFound) {
-        await _forgetDevice();
-      }
-      rethrow;
-    }
-  }
-
-  @override
-  Future<void> resetMpin({
-    required String phone,
-    required String verificationToken,
-    required String mpin,
-  }) async {
-    final data = await _call(() => _api.post('/auth/mpin/reset', {
-          'phone': phone,
-          'verificationToken': verificationToken,
-          'mpin': mpin,
+    final data = await _call(() => _api.post('/auth/verification/resend', {
+          'email': email,
+          'password': password,
         }));
-    if (data['ok'] != true) throw const AuthException(AuthError.unknown);
-    // The backend forgot every other phone; this one is trusted again.
-    await _saveDevice(phone, data);
+    return data['alreadyVerified'] == true;
   }
 
   @override
-  Future<void> changeMpin({
-    required String currentMpin,
-    required String mpin,
+  Future<void> forgotPassword({required String email}) async {
+    await _call(() => _api.post('/auth/password/forgot', {'email': email}));
+  }
+
+  @override
+  Future<void> changePassword({
+    required String currentPassword,
+    required String password,
   }) async {
-    final data = await _call(() => _api.post('/auth/mpin/change', {
-          'currentMpin': currentMpin,
-          'mpin': mpin,
+    final data = await _call(() => _api.post('/auth/password/change', {
+          'currentPassword': currentPassword,
+          'password': password,
         }));
     if (data['ok'] != true) throw const AuthException(AuthError.unknown);
   }
@@ -387,30 +263,6 @@ class ApiAuthService implements AuthService {
     } catch (_) {}
   }
 
-  /// Keeps the device key from a verified code. A backend without trusted
-  /// phones sends none: then every login asks for a code, as before.
-  Future<void> _saveDevice(String phone, Map<String, dynamic> data) async {
-    final key = data['deviceKey'];
-    try {
-      if (key is String && key.isNotEmpty) {
-        await _storage.saveDevice(phone, key);
-      } else {
-        await _storage.deleteDevice();
-      }
-    } catch (_) {
-      // Not saved: the next login asks for a code again.
-    }
-  }
-
-  Future<void> _forgetDevice() async {
-    try {
-      await _storage.deleteDevice();
-    } catch (_) {}
-  }
-
-  static Duration? _seconds(Object? value) =>
-      value is num && value > 0 ? Duration(seconds: value.toInt()) : null;
-
   static Future<Map<String, dynamic>> _call(
     Future<Map<String, dynamic>> Function() send,
   ) async {
@@ -425,34 +277,28 @@ class ApiAuthService implements AuthService {
   static AuthException toAuthException(ApiException e) {
     final status = e.statusCode;
     final code = e.code ?? '';
-    final left = e.attemptsLeft;
     final retry = e.retryAfter;
 
     final error = switch (code) {
       'invalid_name' => AuthError.invalidName,
-      'invalid_phone' => AuthError.invalidPhone,
+      'invalid_email' => AuthError.invalidEmail,
+      'invalid_password' => AuthError.invalidPassword,
+      'weak_password' => AuthError.weakPassword,
       'already_registered' => AuthError.alreadyRegistered,
-      'account_not_found' || 'not_found' => AuthError.accountNotFound,
-      'wrong_code' => AuthError.wrongCode,
-      'expired' || 'code_expired' => AuthError.codeExpired,
-      'too_many_attempts' => AuthError.tooManyAttempts,
-      'too_many_requests' => AuthError.tooManyRequests,
-      'verification_expired' => AuthError.verificationExpired,
-      'device_not_trusted' => AuthError.deviceNotTrusted,
-      'wrong_mpin' => AuthError.wrongMpin,
-      'mpin_locked' || 'locked' => AuthError.mpinLocked,
-      'weak_mpin' => AuthError.weakMpin,
-      'invalid_mpin' => AuthError.weakMpin,
-      'sms_failed' => AuthError.smsFailed,
+      'invalid_credentials' => AuthError.invalidCredentials,
+      'email_not_verified' => AuthError.emailNotVerified,
+      'account_locked' || 'locked' => AuthError.accountLocked,
+      'account_deactivated' => AuthError.accountDeactivated,
+      'email_failed' => AuthError.emailFailed,
       _ => null,
     };
     if (error != null) {
-      return AuthException(error, attemptsLeft: left, retryAfter: retry);
+      return AuthException(error, retryAfter: retry, email: e.email);
     }
     if (status == null) return const AuthException(AuthError.network);
     if (status == 401) return const AuthException(AuthError.sessionExpired);
     if (status == 429) {
-      return AuthException(AuthError.tooManyRequests, retryAfter: retry);
+      return AuthException(AuthError.unknown, retryAfter: retry);
     }
     // Laravel answers 404 without a "code" when a route does not exist.
     if (status == 404 || status == 405) {
@@ -472,59 +318,34 @@ class UnavailableAuthService implements AuthService {
   static const _error = AuthException(AuthError.unavailable);
 
   @override
-  Future<OtpTicket> requestOtp({
-    required String phone,
-    required AuthFlow flow,
-  }) async =>
-      throw _error;
-
-  @override
-  Future<String> verifyOtp({
-    required String phone,
-    required String code,
-    required AuthFlow flow,
-  }) async =>
-      throw _error;
-
-  @override
   Future<void> register({
     required RegistrationName name,
-    required String phone,
-    required String verificationToken,
-    required String mpin,
+    required String email,
+    required String password,
   }) async =>
       throw _error;
 
   @override
   Future<void> login({
-    required String phone,
-    required String verificationToken,
-    required String mpin,
+    required String email,
+    required String password,
   }) async =>
       throw _error;
 
   @override
-  Future<String?> trustedPhone() async => null;
-
-  @override
-  Future<void> loginOnTrustedPhone({
-    required String phone,
-    required String mpin,
+  Future<bool> resendVerification({
+    required String email,
+    required String password,
   }) async =>
       throw _error;
 
   @override
-  Future<void> resetMpin({
-    required String phone,
-    required String verificationToken,
-    required String mpin,
-  }) async =>
-      throw _error;
+  Future<void> forgotPassword({required String email}) async => throw _error;
 
   @override
-  Future<void> changeMpin({
-    required String currentMpin,
-    required String mpin,
+  Future<void> changePassword({
+    required String currentPassword,
+    required String password,
   }) async =>
       throw _error;
 

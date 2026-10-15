@@ -4,7 +4,7 @@ import 'package:provider/provider.dart';
 
 import 'app_state/accessibility_provider.dart';
 import 'app_state/auth/login_flow.dart';
-import 'app_state/auth/mpin_reset_flow.dart';
+import 'app_state/auth/password_reset_flow.dart';
 import 'app_state/auth/registration_flow.dart';
 import 'app_state/session_provider.dart';
 import 'app_state/user_provider.dart';
@@ -91,21 +91,21 @@ Future<void> main() async {
   final user = UserProvider(prefs);
   final accessibility = await AccessibilityProvider.load(prefs);
 
-  // Sign-in flows. Create Account and Login keep separate business logic;
-  // only the code step (OtpChallenge) and the session are shared.
+  // Sign-in flows. Sign up, Login and Forgot password keep separate
+  // business logic; only the session is shared.
   final registration = RegistrationFlow(auth: auth, session: session);
   final login = LoginFlow(auth: auth, session: session);
-  final mpinReset = MpinResetFlow(auth: auth, session: session);
+  final passwordReset = PasswordResetFlow(auth: auth, session: session);
 
-  // After Create Account or Login: remember the number, show the name typed
+  // After Create Account or Login: remember the address, show the name typed
   // in Create Account right away (Home header, Account > Personal
   // information), then what the server has (the linked senior record wins).
-  session.afterSignIn = (phone, name) async {
-    await user.confirmPhone(phone);
+  session.afterSignIn = (email, name) async {
+    await user.confirmEmail(email);
     if (name != null) await user.applyRegistrationName(name);
     final profile = await identity.refreshFromServer();
     if (profile != null) await user.applyLinkedProfile(profile);
-    // Keep the name the MPIN screen greets with ("Welcome back, Rosela").
+    // Keep the name Login greets with ("Welcome back, Rosela").
     final fullName = user.profile?.fullName ?? '';
     if (fullName.isNotEmpty) {
       try {
@@ -114,15 +114,14 @@ Future<void> main() async {
     }
   };
 
-  // The app was opened again on a phone that already has the account:
-  // say who it is, then show "Enter your MPIN". No code is texted and the
-  // Create Account flow is never started again.
-  session.resumeMpinLogin = (phone, fullName) async {
-    await user.confirmPhone(phone);
+  // The app was opened again on a phone that already has the account: say
+  // who it is, so Login can greet them by name. Sign up is never started
+  // again, and nothing is emailed.
+  session.resumeLogin = (email, fullName) async {
+    await user.confirmEmail(email);
     if (fullName != null && fullName.isNotEmpty && user.firstName.isEmpty) {
       await user.saveProfile(fullName: fullName, role: UserRole.senior);
     }
-    await login.resumeOnThisPhone(phone);
   };
 
   // The backend refused the session token: back to Login.
@@ -137,7 +136,7 @@ Future<void> main() async {
     await photoStore.clear();
     registration.reset();
     login.reset();
-    mpinReset.reset();
+    passwordReset.reset();
     user.reset();
     applications.reset();
     documents.reset();
@@ -172,7 +171,7 @@ Future<void> main() async {
         Provider<AuthService>.value(value: auth),
         Provider<RegistrationFlow>.value(value: registration),
         Provider<LoginFlow>.value(value: login),
-        Provider<MpinResetFlow>.value(value: mpinReset),
+        Provider<PasswordResetFlow>.value(value: passwordReset),
         Provider<BenefitsService>.value(value: BenefitsService(api)),
         Provider<PensionService>.value(value: PensionService(api)),
         Provider<SosService>.value(value: SosService()),

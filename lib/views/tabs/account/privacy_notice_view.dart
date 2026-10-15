@@ -28,7 +28,8 @@ class PrivacyNoticeView extends StatelessWidget {
     ),
     (
       'How we keep it safe',
-      'Your MPIN is stored in encrypted storage on your phone. Photos of '
+      'Your password is never kept on your phone: only the OSCA server has '
+          'it, as a scrambled code that cannot be read back. Photos of '
           'your papers are kept in the app\'s private folder, which other '
           'apps cannot open. Everything is removed from the phone when you '
           'log out.',

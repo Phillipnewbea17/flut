@@ -1,151 +1,94 @@
-import '../../app_state/user_provider.dart';
 import '../../models/onboarding_stage.dart';
 import '../../services/auth_service.dart';
-import '../../utils/mpin_validator.dart';
 import '../session_provider.dart';
-import 'auth_steps.dart';
-import 'otp_challenge.dart';
+import '../user_provider.dart';
 
 /// Login (returning user, existing account only):
 ///
-///   new phone:      requestLoginOtp -> verifyLoginOtp -> verifyMpin -> Home
-///   trusted phone:  requestLoginOtp -> verifyMpin -> Home (no code)
-///   app re-opened:  resumeOnThisPhone -> verifyMpin -> Home (no code)
+///   email + password -> Home
 ///
-/// A phone is trusted once it verified a code for this number (Create
-/// Account, an earlier login, or Forgot MPIN). Never creates an account,
-/// never asks for a name, never creates an MPIN. The backend refuses an
-/// unknown number, checks the code or the phone's device key, then checks
-/// the existing MPIN and returns the session token.
-class LoginFlow implements OtpStep {
+/// One screen. Never creates an account, never asks for a name. The backend
+/// answers "invalid_credentials" for both a wrong address and a wrong
+/// password, so this flow cannot be used to find out who has an account,
+/// and locks the account after too many wrong passwords.
+///
+/// An account whose address was never confirmed is sent to Check Your
+/// Inbox instead, with the address and password it just used, so "Resend
+/// email" works without asking for them again.
+class LoginFlow {
   LoginFlow({required AuthService auth, required SessionProvider session})
       : _auth = auth,
-        _session = session,
-        _otp = OtpChallenge(auth, AuthFlow.login);
+        _session = session;
 
   final AuthService _auth;
   final SessionProvider _session;
-  final OtpChallenge _otp;
 
-  /// Set when this phone is trusted for the number: no code is sent.
-  String? _trustedPhone;
+  String _unverifiedEmail = '';
+  String _unverifiedPassword = '';
 
-  @override
   AuthFlow get kind => AuthFlow.login;
 
-  /// The app was opened again on a phone that already has the account
-  /// (SessionProvider.resumeMpinLogin at the splash): go straight to
-  /// "Enter your MPIN" with its number, without asking for the number and
-  /// without texting a code.
-  Future<void> resumeOnThisPhone(String phone) async {
-    _otp.clear();
-    _trustedPhone = phone;
-    await _session.enter(OnboardingStage.mpinEntry, kind);
-  }
+  /// The address to fill in: the one this phone last used, if any.
+  String get email => _session.lastEmail;
 
-  Future<void> requestLoginOtp(String rawPhone) async {
-    final phone = UserProvider.normalizePhone(rawPhone);
-    if (UserProvider.isValidPhone(phone) &&
-        await _auth.trustedPhone() == phone) {
-      _otp.clear();
-      _trustedPhone = phone;
-      await _session.enter(OnboardingStage.mpinEntry, kind);
-      return;
+  /// The address waiting to be confirmed, for Check Your Inbox.
+  String get unverifiedEmail => _unverifiedEmail;
+
+  /// Laravel checks the password and returns the session token. Only then
+  /// is the user signed in and taken Home.
+  Future<void> logIn({
+    required String rawEmail,
+    required String password,
+  }) async {
+    final email = UserProvider.normalizeEmail(rawEmail);
+    if (!UserProvider.isValidEmail(email)) {
+      throw const AuthException(AuthError.invalidEmail);
     }
-    _trustedPhone = null;
-    await _otp.send(rawPhone);
-    await _session.enter(OnboardingStage.otpVerify, kind);
-  }
-
-  Future<void> verifyLoginOtp(String code) async {
-    await _otp.verify(code);
-    await _session.enter(OnboardingStage.mpinEntry, kind);
-  }
-
-  @override
-  String get phone => _trustedPhone ?? _otp.phone;
-  @override
-  OtpTicket get ticket => _otp.ticket;
-  @override
-  DateTime? get codeSentAt => _otp.sentAt;
-  @override
-  bool get codeExpired => _otp.expired;
-  @override
-  bool get codeLocked => _otp.locked;
-  @override
-  Future<void> resendOtp() => _otp.resend();
-  @override
-  Future<void> verifyOtp(String code) => verifyLoginOtp(code);
-
-  @override
-  Future<void> changeNumber() async {
-    reset();
-    await _session.enter(OnboardingStage.signedOut, kind);
-  }
-
-  /// The existing MPIN. The hash kept on this phone catches a wrong MPIN
-  /// first (and counts the tries, so they are limited even offline); the
-  /// backend then checks it again and returns the session.
-  Future<void> verifyMpin(String mpin) async {
-    if (!MpinValidator.isComplete(mpin)) {
-      throw const AuthException(AuthError.wrongMpin);
+    if (password.isEmpty) {
+      throw const AuthException(AuthError.invalidCredentials);
     }
-    await _session.checkStoredMpin(mpin);
-    await authenticate(mpin);
-  }
 
-  /// Laravel checks the MPIN and returns the session token. Only then is the
-  /// user signed in and taken Home.
-  Future<void> authenticate(String mpin) async {
-    final trusted = _trustedPhone;
-    if (trusted != null) return _authenticateTrusted(trusted, mpin);
-
-    final token = _otp.verificationToken;
-    if (token == null) await _lost();
     try {
-      await _auth.login(
-        phone: _otp.phone,
-        verificationToken: token,
-        mpin: mpin,
-      );
+      await _auth.login(email: email, password: password);
     } on AuthException catch (e) {
-      if (e.error == AuthError.verificationExpired) await _lost();
-      rethrow;
-    }
-    final phone = _otp.phone;
-    reset();
-    await _session.startSession(phone, mpin: mpin);
-  }
-
-  /// MPIN only. When the backend no longer trusts this phone (the MPIN was
-  /// reset on another phone), a code is texted and the code screen opens.
-  Future<void> _authenticateTrusted(String phone, String mpin) async {
-    try {
-      await _auth.loginOnTrustedPhone(phone: phone, mpin: mpin);
-    } on AuthException catch (e) {
-      if (e.error == AuthError.deviceNotTrusted) {
-        _trustedPhone = null;
-        try {
-          await _otp.send(phone);
-        } on AuthException {
-          await changeNumber();
-          rethrow;
-        }
-        await _session.enter(OnboardingStage.otpVerify, kind);
+      if (e.error == AuthError.emailNotVerified) {
+        // The password was right, so holding it is safe enough to let the
+        // senior ask for the email again without retyping it.
+        _unverifiedEmail = e.email ?? email;
+        _unverifiedPassword = password;
+        await _session.enter(OnboardingStage.checkInbox, kind);
       }
       rethrow;
     }
+
     reset();
-    await _session.startSession(phone, mpin: mpin);
+    await _session.startSession(email);
   }
 
-  Future<Never> _lost() async {
-    await changeNumber();
-    throw const AuthException(AuthError.verificationExpired);
+  /// "Resend email" on Check Your Inbox. Returns true when the address
+  /// turned out to be confirmed already.
+  Future<bool> resendVerification() async {
+    if (_unverifiedEmail.isEmpty || _unverifiedPassword.isEmpty) {
+      throw const AuthException(AuthError.sessionExpired);
+    }
+    return _auth.resendVerification(
+      email: _unverifiedEmail,
+      password: _unverifiedPassword,
+    );
   }
 
+  /// "I have confirmed it - go to Login": back to the login screen, and the
+  /// password is forgotten.
+  Future<void> backToLogin() async {
+    final email = _unverifiedEmail;
+    reset();
+    if (email.isNotEmpty) await _session.rememberEmail(email);
+    await _session.startFlow(AuthFlow.login);
+  }
+
+  /// Log out, or the flow finished: forget the held password.
   void reset() {
-    _otp.clear();
-    _trustedPhone = null;
+    _unverifiedEmail = '';
+    _unverifiedPassword = '';
   }
 }

@@ -15,9 +15,10 @@ import '../views/identity/personal_info_setup_view.dart';
 import '../views/identity/scan_id_view.dart';
 import '../views/identity/selfie_capture_view.dart';
 import '../views/identity/verification_result_view.dart';
-import '../views/onboarding/mpin_view.dart';
-import '../views/onboarding/otp_verify_view.dart';
-import '../views/onboarding/phone_entry_view.dart';
+import '../views/onboarding/check_inbox_view.dart';
+import '../views/onboarding/forgot_password_view.dart';
+import '../views/onboarding/login_view.dart';
+import '../views/onboarding/register_credentials_view.dart';
 import '../views/onboarding/register_name_view.dart';
 import '../views/onboarding/splash_loading_view.dart';
 import '../views/onboarding/welcome_view.dart';
@@ -25,6 +26,8 @@ import '../views/shared/qr_cashier_view.dart';
 import '../views/tabs/account/accessibility_view.dart';
 import '../views/tabs/account/account_view.dart';
 import '../views/tabs/account/change_address_view.dart';
+import '../views/tabs/account/change_password_view.dart';
+import '../views/tabs/account/change_phone_view.dart';
 import '../views/tabs/account/contact_us_view.dart';
 import '../views/tabs/account/emergency_contact_view.dart';
 import '../views/tabs/account/faq_view.dart';
@@ -65,55 +68,46 @@ class Routes {
   /// Onboarding: Create Account or Login.
   static const String welcome = '/welcome';
 
-  // Create Account (new user). "/register" opens the first step.
+  // Sign up (new user). "/register" opens the first step.
+  // name -> email + password + confirm -> check your inbox.
   static const String register = '/register';
   static const String registerName = '/register/name';
-  static const String registerMobile = '/register/mobile';
-  static const String registerOtp = '/register/otp';
-  static const String registerCreateMpin = '/register/create-mpin';
-  static const String registerConfirmMpin = '/register/confirm-mpin';
+  static const String registerCredentials = '/register/credentials';
 
-  // Login (returning user). "/login" opens the first step.
+  // Login (returning user): one screen, email + password.
   static const String login = '/login';
-  static const String loginMobile = '/login/mobile';
-  static const String loginOtp = '/login/otp';
-  static const String loginMpin = '/login/mpin';
 
-  // Forgot MPIN. "/forgot-mpin" opens the first step.
-  static const String forgotMpin = '/forgot-mpin';
-  static const String forgotMobile = '/forgot-mpin/mobile';
-  static const String forgotOtp = '/forgot-mpin/otp';
-  static const String forgotCreateMpin = '/forgot-mpin/create-mpin';
-  static const String forgotConfirmMpin = '/forgot-mpin/confirm-mpin';
+  // Forgot password: one screen. The new password is typed on the page the
+  // emailed link opens, which the backend serves, not this app.
+  static const String forgotPassword = '/forgot-password';
 
-  /// Short addresses -> the first step of their flow.
+  /// "Check your inbox", until the emailed link has been tapped. Reached
+  /// from Sign up and from a login that was refused as unconfirmed, so it
+  /// is one screen for both flows.
+  static const String checkInbox = '/check-inbox';
+
+  /// Short addresses that are not a screen themselves -> the first step of
+  /// their flow. Login and Forgot password are single screens, so their own
+  /// address is where they live and neither needs redirecting.
   static const Map<String, String> flowStarts = {
     register: registerName,
-    login: loginMobile,
-    forgotMpin: forgotMobile,
   };
 
   /// The first screen of each flow.
   static String entryFor(AuthFlow? flow) => switch (flow) {
-        AuthFlow.register => registerName,
-        AuthFlow.login => loginMobile,
-        AuthFlow.resetMpin => forgotMobile,
-        null => welcome,
-      };
+    AuthFlow.register => registerName,
+    AuthFlow.login => login,
+    AuthFlow.forgotPassword => forgotPassword,
+    null => welcome,
+  };
 
   /// The screen for [stage] in [flow], or null when the stage has none.
   static String? screenFor(OnboardingStage stage, AuthFlow? flow) =>
       switch ((stage, flow)) {
-        (OnboardingStage.phoneEntry, AuthFlow.register) => registerMobile,
-        (OnboardingStage.otpVerify, AuthFlow.register) => registerOtp,
-        (OnboardingStage.otpVerify, AuthFlow.login) => loginOtp,
-        (OnboardingStage.otpVerify, AuthFlow.resetMpin) => forgotOtp,
-        (OnboardingStage.mpinSetup, AuthFlow.register) => registerCreateMpin,
-        (OnboardingStage.mpinSetup, AuthFlow.resetMpin) => forgotCreateMpin,
-        (OnboardingStage.mpinConfirm, AuthFlow.register) =>
-          registerConfirmMpin,
-        (OnboardingStage.mpinConfirm, AuthFlow.resetMpin) => forgotConfirmMpin,
-        (OnboardingStage.mpinEntry, AuthFlow.login) => loginMpin,
+        (OnboardingStage.credentials, AuthFlow.register) =>
+        registerCredentials,
+        (OnboardingStage.checkInbox, AuthFlow.register) => checkInbox,
+        (OnboardingStage.checkInbox, AuthFlow.login) => checkInbox,
         _ => null,
       };
 
@@ -121,8 +115,8 @@ class Routes {
   static const Set<String> signedOut = {
     welcome,
     registerName,
-    loginMobile,
-    forgotMobile,
+    login,
+    forgotPassword,
     contact,
   };
 
@@ -142,8 +136,8 @@ class Routes {
   /// the only screens (plus Contact us) the user can open.
   static bool isIdentitySetup(String location) =>
       location.startsWith('/personal-information/') ||
-      location == identityVerification ||
-      location.startsWith('$identityVerification/');
+          location == identityVerification ||
+          location.startsWith('$identityVerification/');
 
   // The five bottom-navigation tabs, in order.
   static const String home = '/home';
@@ -208,6 +202,7 @@ class Routes {
       '$personalInfo/correction?field=${field.name}';
   static const String correction = '/account/personal/correction';
   static const String address = '/account/address';
+  static const String phoneNumber = '/account/phone';
   static const String emergencyContact = '/account/emergency-contact';
   static const String family = '/account/family';
   static const String accessibility = '/account/accessibility';
@@ -216,7 +211,7 @@ class Routes {
   static const String contact = '/account/contact';
 
   /// Opened from Account. Not part of setup, so the guard leaves it alone.
-  static const String changeMpin = '/change-mpin';
+  static const String changePassword = '/change-password';
 
   /// Screens that belong to signing in and setup.
   static const Set<String> onboarding = {
@@ -224,19 +219,10 @@ class Routes {
     welcome,
     register,
     registerName,
-    registerMobile,
-    registerOtp,
-    registerCreateMpin,
-    registerConfirmMpin,
+    registerCredentials,
     login,
-    loginMobile,
-    loginOtp,
-    loginMpin,
-    forgotMpin,
-    forgotMobile,
-    forgotOtp,
-    forgotCreateMpin,
-    forgotConfirmMpin,
+    forgotPassword,
+    checkInbox,
     personalInfoSetup,
     scanId,
     captureId,
@@ -254,7 +240,7 @@ class Routes {
 ///
 /// Every screen of the app (Home, Applications, My ID, Benefits, Account,
 /// Notifications...) needs [OnboardingStage.completed], which is only
-/// reached after Laravel accepted the code AND the MPIN (Login) or created
+/// reached after Laravel accepted the email and password (Login) or created
 /// the account (Create Account) and returned a session.
 String? appRedirect({
   required bool splashDone,
@@ -267,7 +253,7 @@ String? appRedirect({
   // 1. Splash (which checks the saved session) always comes first.
   if (!splashDone) return goTo(Routes.splash);
 
-  // "/register", "/login", "/forgot-mpin" start their flow.
+  // "/register", "/login", "/forgot-password" start their flow.
   final start = Routes.flowStarts[location];
 
   // 2. The stage decides the screen.
@@ -276,20 +262,17 @@ String? appRedirect({
       if (start != null) return start;
       if (Routes.signedOut.contains(location)) return null;
       return Routes.entryFor(flow);
-    case OnboardingStage.phoneEntry:
-    case OnboardingStage.otpVerify:
-    case OnboardingStage.mpinSetup:
-    case OnboardingStage.mpinConfirm:
-    case OnboardingStage.mpinEntry:
+    case OnboardingStage.credentials:
+    case OnboardingStage.checkInbox:
       return goTo(Routes.screenFor(stage, flow) ?? Routes.welcome);
     case OnboardingStage.identitySetup:
-      // Any screen of the setup, and "Contact OSCA" from them.
+    // Any screen of the setup, and "Contact OSCA" from them.
       if (Routes.isIdentitySetup(location) || location == Routes.contact) {
         return null;
       }
       return Routes.personalInfoSetup;
     case OnboardingStage.completed:
-      // 3. Signed in and linked: the app.
+    // 3. Signed in and linked: the app.
       return Routes.onboarding.contains(location) ? Routes.home : null;
   }
 }
@@ -300,8 +283,8 @@ GoRoute _page(String path, Widget Function(GoRouterState state) build) =>
 
 /// One bottom-navigation tab.
 StatefulShellBranch _tab(String path, Widget view) => StatefulShellBranch(
-      routes: [GoRoute(path: path, builder: (context, state) => view)],
-    );
+  routes: [GoRoute(path: path, builder: (context, state) => view)],
+);
 
 class AppRouter {
   AppRouter._();
@@ -321,52 +304,39 @@ class AppRouter {
         // Signing in
         _page(Routes.splash, (_) => const SplashLoadingView()),
         _page(Routes.welcome, (_) => const WelcomeView()),
-        // The redirect sends these three to the first step of their flow.
+        // The redirect sends "/register" to the first step of its flow.
         for (final start in Routes.flowStarts.keys)
           _page(start, (_) => const SizedBox.shrink()),
 
-        // Create Account (new user)
+        // Sign up (new user): name, then email + password + confirm
         _page(Routes.registerName, (_) => const RegisterNameView()),
-        _page(Routes.registerMobile,
-            (_) => const PhoneEntryView(flow: AuthFlow.register)),
-        _page(Routes.registerOtp,
-            (_) => const OtpVerifyView(flow: AuthFlow.register)),
-        _page(Routes.registerCreateMpin,
-            (_) => const MpinView(mode: MpinMode.create, flow: AuthFlow.register)),
-        _page(Routes.registerConfirmMpin,
-            (_) => const MpinView(mode: MpinMode.confirm, flow: AuthFlow.register)),
+        _page(Routes.registerCredentials,
+                (_) => const RegisterCredentialsView()),
 
-        // Login (returning user)
-        _page(Routes.loginMobile,
-            (_) => const PhoneEntryView(flow: AuthFlow.login)),
-        _page(Routes.loginOtp, (_) => const OtpVerifyView(flow: AuthFlow.login)),
-        _page(Routes.loginMpin,
-            (_) => const MpinView(mode: MpinMode.enter, flow: AuthFlow.login)),
+        // Login (returning user): email + password, on one screen
+        _page(Routes.login, (_) => const LoginView()),
 
-        // Forgot MPIN
-        _page(Routes.forgotMobile,
-            (_) => const PhoneEntryView(flow: AuthFlow.resetMpin)),
-        _page(Routes.forgotOtp,
-            (_) => const OtpVerifyView(flow: AuthFlow.resetMpin)),
-        _page(Routes.forgotCreateMpin,
-            (_) => const MpinView(mode: MpinMode.create, flow: AuthFlow.resetMpin)),
-        _page(Routes.forgotConfirmMpin,
-            (_) => const MpinView(mode: MpinMode.confirm, flow: AuthFlow.resetMpin)),
+        // Forgot password: ask for the address; the link does the rest
+        _page(Routes.forgotPassword, (_) => const ForgotPasswordView()),
+
+        // Waiting for the emailed link to be tapped (Sign up, or a login
+        // refused because the address was never confirmed)
+        _page(Routes.checkInbox, (_) => const CheckInboxView()),
 
         // Senior citizen record
         _page(Routes.personalInfoSetup, (_) => const PersonalInfoSetupView()),
         _page(Routes.scanId, (_) => const ScanIdView()),
         _page(Routes.captureId, (_) => const CaptureIdView()),
         _page(Routes.manualInfo,
-            (_) => const PersonalInfoFormView(mode: InfoFormMode.manual)),
+                (_) => const PersonalInfoFormView(mode: InfoFormMode.manual)),
         _page(Routes.reviewInfo,
-            (_) => const PersonalInfoFormView(mode: InfoFormMode.review)),
+                (_) => const PersonalInfoFormView(mode: InfoFormMode.review)),
         _page(Routes.identityVerification,
-            (_) => const IdentityVerificationView()),
+                (_) => const IdentityVerificationView()),
         _page(Routes.selfie, (_) => const SelfieCaptureView()),
         _page(Routes.verificationResult,
-            (_) => const VerificationResultView()),
-        _page(Routes.changeMpin, (_) => const MpinView(mode: MpinMode.change)),
+                (_) => const VerificationResultView()),
+        _page(Routes.changePassword, (_) => const ChangePasswordView()),
 
         // The app: Home | Applications | My ID | Benefits | Account.
         // indexedStack keeps every tab alive, so scrolling and typing are
@@ -395,15 +365,15 @@ class AppRouter {
         // Requests to the OSCA office
         _page(Routes.assistance, (_) => const AssistanceView()),
         _page(Routes.medical,
-            (_) => const RequestsHubView(kind: RequestKind.medical)),
+                (_) => const RequestsHubView(kind: RequestKind.medical)),
         _page(Routes.medicalNew, (_) => const MedicalRequestFormView()),
         _page(Routes.burial,
-            (_) => const RequestsHubView(kind: RequestKind.burial)),
+                (_) => const RequestsHubView(kind: RequestKind.burial)),
         _page(Routes.burialNew, (_) => const BurialRequestFormView()),
         _page(Routes.help, (_) => const RequestsHubView(kind: RequestKind.help)),
         _page(
           Routes.helpNew,
-          (state) => HelpRequestFormView(
+              (state) => HelpRequestFormView(
             category: HelpCategoryInfo.parse(
               state.uri.queryParameters['category'],
             ),
@@ -413,7 +383,7 @@ class AppRouter {
         _page(Routes.requests, (_) => const RequestHistoryView()),
         _page(
           '${Routes.requests}/:id',
-          (state) => RequestDetailView(
+              (state) => RequestDetailView(
             id: state.pathParameters['id'] ?? '',
             justSent: state.uri.queryParameters['new'] == '1',
           ),
@@ -428,7 +398,7 @@ class AppRouter {
         // Benefits
         _page(
           Routes.benefits,
-          (state) => BenefitsServicesView(
+              (state) => BenefitsServicesView(
             initialFilter: BenefitCategoryInfo.tryParse(
               state.uri.queryParameters['category'],
             ),
@@ -441,12 +411,13 @@ class AppRouter {
         _page(Routes.personalInfo, (_) => const PersonalInfoView()),
         _page(
           Routes.correction,
-          (state) => ProfileCorrectionView(
+              (state) => ProfileCorrectionView(
             initialField:
-                PersonalFieldInfo.tryParse(state.uri.queryParameters['field']),
+            PersonalFieldInfo.tryParse(state.uri.queryParameters['field']),
           ),
         ),
         _page(Routes.address, (_) => const ChangeAddressView()),
+        _page(Routes.phoneNumber, (_) => const ChangePhoneView()),
         _page(Routes.emergencyContact, (_) => const EmergencyContactView()),
         _page(Routes.family, (_) => const ProxyHubView()),
         _page(Routes.accessibility, (_) => const AccessibilityView()),

@@ -34,7 +34,7 @@ const _appPages = [
   Routes.qrCashier,
   Routes.accessibility,
   Routes.faq,
-  Routes.changeMpin,
+  Routes.changePassword,
 ];
 
 void main() {
@@ -57,22 +57,17 @@ void main() {
     test('first start shows Welcome (onboarding)', () {
       expect(redirect(OnboardingStage.signedOut), Routes.welcome);
     });
-
-    test('/register, /login and /forgot-mpin open their first step', () {
+    test('/register opens its first step', () {
       expect(redirect(OnboardingStage.signedOut, location: Routes.register),
           Routes.registerName);
-      expect(redirect(OnboardingStage.signedOut, location: Routes.login),
-          Routes.loginMobile);
-      expect(redirect(OnboardingStage.signedOut, location: Routes.forgotMpin),
-          Routes.forgotMobile);
     });
 
     test('may open Welcome, the first step of each flow, and Contact', () {
       for (final page in [
         Routes.welcome,
         Routes.registerName,
-        Routes.loginMobile,
-        Routes.forgotMobile,
+        Routes.login,
+        Routes.forgotPassword,
         Routes.contact,
       ]) {
         expect(redirect(OnboardingStage.signedOut, location: page), isNull,
@@ -90,14 +85,8 @@ void main() {
 
     test('cannot skip ahead to later steps', () {
       for (final page in [
-        Routes.registerMobile,
-        Routes.registerOtp,
-        Routes.registerCreateMpin,
-        Routes.registerConfirmMpin,
-        Routes.loginOtp,
-        Routes.loginMpin,
-        Routes.forgotOtp,
-        Routes.forgotCreateMpin,
+        Routes.registerCredentials,
+        Routes.checkInbox,
       ]) {
         expect(redirect(OnboardingStage.signedOut, location: page),
             Routes.welcome,
@@ -108,81 +97,72 @@ void main() {
     test("leaving a flow returns to that flow's first step", () {
       expect(
         redirect(OnboardingStage.signedOut,
-            flow: AuthFlow.login, location: Routes.loginMpin),
-        Routes.loginMobile,
+            flow: AuthFlow.login, location: Routes.checkInbox),
+        Routes.login,
       );
       expect(
         redirect(OnboardingStage.signedOut,
-            flow: AuthFlow.register, location: Routes.registerMobile),
+            flow: AuthFlow.register, location: Routes.registerCredentials),
         Routes.registerName,
       );
       expect(
         redirect(OnboardingStage.signedOut,
-            flow: AuthFlow.resetMpin, location: Routes.forgotOtp),
-        Routes.forgotMobile,
-      );
-    });
-
-    test('after Forgot MPIN, Login (not Home)', () {
-      expect(
-        redirect(OnboardingStage.signedOut,
-            flow: AuthFlow.login, location: Routes.forgotConfirmMpin),
-        Routes.loginMobile,
+            flow: AuthFlow.forgotPassword, location: Routes.checkInbox),
+        Routes.forgotPassword,
       );
     });
   });
 
-  group('Create Account and Login use separate screens', () {
-    test('Create Account: name, mobile, code, create, confirm', () {
+  group('Sign up and Login use separate screens', () {
+    test('Sign up: name, then email + password, then check your inbox', () {
       String? at(OnboardingStage stage) =>
           redirect(stage, flow: AuthFlow.register);
-      expect(at(OnboardingStage.phoneEntry), Routes.registerMobile);
-      expect(at(OnboardingStage.otpVerify), Routes.registerOtp);
-      expect(at(OnboardingStage.mpinSetup), Routes.registerCreateMpin);
-      expect(at(OnboardingStage.mpinConfirm), Routes.registerConfirmMpin);
+      expect(at(OnboardingStage.credentials), Routes.registerCredentials);
+      expect(at(OnboardingStage.checkInbox), Routes.checkInbox);
     });
 
-    test('Login: mobile, code, existing MPIN', () {
-      String? at(OnboardingStage stage) =>
-          redirect(stage, flow: AuthFlow.login);
-      expect(at(OnboardingStage.otpVerify), Routes.loginOtp);
-      expect(at(OnboardingStage.mpinEntry), Routes.loginMpin);
+    test('Login reaches check your inbox when the address is unconfirmed',
+        () {
+      expect(
+        redirect(OnboardingStage.checkInbox, flow: AuthFlow.login),
+        Routes.checkInbox,
+      );
     });
 
-    test('Login never shows a create-MPIN screen', () {
-      expect(Routes.screenFor(OnboardingStage.mpinSetup, AuthFlow.login),
-          isNull);
-      expect(Routes.screenFor(OnboardingStage.mpinConfirm, AuthFlow.login),
-          isNull);
+    test('Login never shows the sign-up credentials screen', () {
+      expect(
+        Routes.screenFor(OnboardingStage.credentials, AuthFlow.login),
+        isNull,
+      );
+      expect(
+        Routes.screenFor(OnboardingStage.credentials, AuthFlow.forgotPassword),
+        isNull,
+      );
     });
 
-    test('Forgot MPIN: code, new MPIN, confirm', () {
-      String? at(OnboardingStage stage) =>
-          redirect(stage, flow: AuthFlow.resetMpin);
-      expect(at(OnboardingStage.otpVerify), Routes.forgotOtp);
-      expect(at(OnboardingStage.mpinSetup), Routes.forgotCreateMpin);
-      expect(at(OnboardingStage.mpinConfirm), Routes.forgotConfirmMpin);
+    test('Forgot password is one screen, so it has no later stage', () {
+      expect(
+        Routes.screenFor(OnboardingStage.checkInbox, AuthFlow.forgotPassword),
+        isNull,
+      );
     });
 
     test('no redirect when already on the right screen', () {
       expect(
-          redirect(OnboardingStage.otpVerify,
-              flow: AuthFlow.login, location: Routes.loginOtp),
+          redirect(OnboardingStage.checkInbox,
+              flow: AuthFlow.login, location: Routes.checkInbox),
           isNull);
       expect(
-          redirect(OnboardingStage.mpinConfirm,
-              flow: AuthFlow.register, location: Routes.registerConfirmMpin),
+          redirect(OnboardingStage.credentials,
+              flow: AuthFlow.register, location: Routes.registerCredentials),
           isNull);
     });
 
     test('cannot reach Home before Laravel signs the user in', () {
       for (final (stage, flow) in [
-        (OnboardingStage.phoneEntry, AuthFlow.register),
-        (OnboardingStage.otpVerify, AuthFlow.register),
-        (OnboardingStage.mpinSetup, AuthFlow.register),
-        (OnboardingStage.mpinConfirm, AuthFlow.register),
-        (OnboardingStage.otpVerify, AuthFlow.login),
-        (OnboardingStage.mpinEntry, AuthFlow.login),
+        (OnboardingStage.credentials, AuthFlow.register),
+        (OnboardingStage.checkInbox, AuthFlow.register),
+        (OnboardingStage.checkInbox, AuthFlow.login),
       ]) {
         for (final page in _appPages) {
           expect(redirect(stage, flow: flow, location: page), isNotNull,
@@ -199,11 +179,10 @@ void main() {
         Routes.welcome,
         Routes.register,
         Routes.registerName,
-        Routes.registerConfirmMpin,
+        Routes.registerCredentials,
         Routes.login,
-        Routes.loginMobile,
-        Routes.loginMpin,
-        Routes.forgotMobile,
+        Routes.forgotPassword,
+        Routes.checkInbox,
       ]) {
         expect(redirect(OnboardingStage.completed, location: page),
             Routes.home,
@@ -220,7 +199,12 @@ void main() {
   });
 
   group('saved stages', () {
-    test('code and MPIN steps are never resumed after a restart', () {
+    test('the sign-up steps are never resumed after a restart', () {
+      expect(
+          OnboardingStage.fromName('credentials'), OnboardingStage.signedOut);
+      expect(
+          OnboardingStage.fromName('checkInbox'), OnboardingStage.signedOut);
+      // Names from older builds, which had a code and an MPIN.
       expect(OnboardingStage.fromName('otpVerify'), OnboardingStage.signedOut);
       expect(OnboardingStage.fromName('mpinSetup'), OnboardingStage.signedOut);
       expect(OnboardingStage.fromName('phoneEntry'), OnboardingStage.signedOut);

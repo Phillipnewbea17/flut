@@ -4,7 +4,6 @@ import 'package:flutter_secure_storage/flutter_secure_storage.dart';
 import 'package:flutter_test/flutter_test.dart';
 import 'package:http/http.dart' as http;
 import 'package:http/testing.dart';
-import 'package:my_senior_app/models/onboarding_stage.dart';
 import 'package:my_senior_app/models/registration_name.dart';
 import 'package:my_senior_app/services/api_client.dart';
 import 'package:my_senior_app/services/auth_service.dart';
@@ -40,145 +39,10 @@ void main() {
 
   setUp(() => FlutterSecureStorage.setMockInitialValues({}));
 
-  group('request a code', () {
-    test('sends the phone and the purpose, reads the timers', () async {
-      final b = _Backend(200, '{"expiresIn":180,"resendIn":45}');
-      final ticket =
-          await b.auth.requestOtp(phone: '9171234567', flow: AuthFlow.register);
-
-      expect(b.last!.url.path, '/api/mobile/auth/code');
-      expect(b.sent, {'phone': '9171234567', 'purpose': 'register'});
-      expect(ticket.expiresIn, const Duration(seconds: 180));
-      expect(ticket.resendIn, const Duration(seconds: 45));
-    });
-
-    test('purpose for login and Forgot MPIN', () async {
-      final b = _Backend(200, '{}');
-      await b.auth.requestOtp(phone: '9171234567', flow: AuthFlow.login);
-      expect(b.sent['purpose'], 'login');
-      await b.auth.requestOtp(phone: '9171234567', flow: AuthFlow.resetMpin);
-      expect(b.sent['purpose'], 'reset_mpin');
-    });
-
-    test('default timers when the backend does not say', () async {
-      final ticket = await _Backend(200, '{}')
-          .auth
-          .requestOtp(phone: '9171234567', flow: AuthFlow.login);
-      expect(ticket.expiresIn, OtpTicket.defaultExpiry);
-      expect(ticket.resendIn, OtpTicket.defaultResend);
-    });
-
-    test('registering an existing number', () {
-      final b = _Backend(409,
-          '{"message":"Phone taken","code":"already_registered"}');
-      expect(
-        b.auth.requestOtp(phone: '9171234567', flow: AuthFlow.register),
-        _authError(AuthError.alreadyRegistered),
-      );
-    });
-
-    test('logging in with an unknown number', () {
-      final b = _Backend(404,
-          '{"message":"No account","code":"account_not_found"}');
-      expect(
-        b.auth.requestOtp(phone: '9171234567', flow: AuthFlow.login),
-        _authError(AuthError.accountNotFound),
-      );
-    });
-
-    test('resend too soon (429)', () {
-      final b = _Backend(429, '{"message":"Too Many Attempts."}');
-      expect(
-        b.auth.requestOtp(phone: '9171234567', flow: AuthFlow.login),
-        _authError(AuthError.tooManyRequests),
-      );
-    });
-
-    test('a backend without the route is "not available"', () {
-      final b = _Backend(404, '{"message":"Not Found"}');
-      expect(
-        b.auth.requestOtp(phone: '9171234567', flow: AuthFlow.login),
-        _authError(AuthError.unavailable),
-      );
-    });
-  });
-
-  group('verify the code', () {
-    test('a right code returns a verification token, not a session',
+  group('sign up', () {
+    test('sends the name, address and password, and gets no session',
         () async {
-      final b = _Backend(200, '{"verificationToken":"v-1","expiresIn":600}');
-      final token = await b.auth.verifyOtp(
-          phone: '9171234567', code: '4827', flow: AuthFlow.login);
-
-      expect(token, 'v-1');
-      expect(b.sent,
-          {'phone': '9171234567', 'code': '4827', 'purpose': 'login'});
-      expect(b.api.token, isNull);
-      expect(await const AuthStorage().readToken(), isNull);
-    });
-
-    test('an incorrect code, with tries left', () {
-      final b = _Backend(422,
-          '{"message":"Wrong","code":"wrong_code","attemptsLeft":2}');
-      expect(
-        b.auth.verifyOtp(
-            phone: '9171234567', code: '1111', flow: AuthFlow.login),
-        throwsA(isA<AuthException>()
-            .having((e) => e.error, 'error', AuthError.wrongCode)
-            .having((e) => e.attemptsLeft, 'attemptsLeft', 2)
-            .having((e) => e.message, 'message',
-                startsWith('That code is incorrect.'))),
-      );
-    });
-
-    test('an expired code', () {
-      final b = _Backend(422, '{"message":"Expired","code":"expired"}');
-      expect(
-        b.auth.verifyOtp(
-            phone: '9171234567', code: '1111', flow: AuthFlow.login),
-        throwsA(isA<AuthException>().having((e) => e.message, 'message',
-            'This code has expired. Please request a new code.')),
-      );
-    });
-
-    test('too many attempts', () {
-      final b =
-          _Backend(429, '{"message":"Locked","code":"too_many_attempts"}');
-      expect(
-        b.auth.verifyOtp(
-            phone: '9171234567', code: '1111', flow: AuthFlow.login),
-        _authError(AuthError.tooManyAttempts),
-      );
-    });
-
-    test('an old backend that signs in with the code alone is refused',
-        () async {
-      final b = _Backend(200, '{"token":"1|session"}');
-      await expectLater(
-        b.auth.verifyOtp(
-            phone: '9171234567', code: '4827', flow: AuthFlow.login),
-        _authError(AuthError.unavailable),
-      );
-      expect(b.api.token, isNull);
-    });
-
-    test("the server's own words are never shown", () async {
-      final b = _Backend(
-          422, '{"message":"SQLSTATE[42S22] column otp_hash","code":"x"}');
-      try {
-        await b.auth.verifyOtp(
-            phone: '9171234567', code: '1111', flow: AuthFlow.login);
-        fail('should throw');
-      } on AuthException catch (e) {
-        expect(e.message, isNot(contains('SQLSTATE')));
-        expect(e.error, AuthError.unknown);
-      }
-    });
-  });
-
-  group('MPIN', () {
-    test('register sends the name and saves the session token', () async {
-      final b = _Backend(201, '{"token":"1|secret"}');
+      final b = _Backend(201, '{"ok":true,"email":"ana@example.com"}');
       await b.auth.register(
         name: const RegistrationName(
           firstName: ' Rosela ',
@@ -187,9 +51,8 @@ void main() {
           suffix: '',
           noMiddleName: true,
         ),
-        phone: '9171234567',
-        verificationToken: 'v-1',
-        mpin: '4827',
+        email: 'ana@example.com',
+        password: 'Tahimik-2026',
       );
 
       expect(b.last!.url.path, '/api/mobile/auth/register');
@@ -199,63 +62,229 @@ void main() {
         'lastName': 'Mabuhay',
         'suffix': null,
         'noMiddleName': true,
-        'phone': '9171234567',
-        'verificationToken': 'v-1',
-        'mpin': '4827',
+        'email': 'ana@example.com',
+        'password': 'Tahimik-2026',
       });
-      expect(b.api.token, '1|secret');
-      expect(await const AuthStorage().readToken(), '1|secret');
-    });
 
-    test('correct MPIN login saves the session token', () async {
-      final b = _Backend(200, '{"token":"2|secret"}');
-      await b.auth.login(
-          phone: '9171234567', verificationToken: 'v-1', mpin: '4827');
-      expect(b.last!.url.path, '/api/mobile/auth/login');
-      expect(b.api.token, '2|secret');
-    });
-
-    test('incorrect MPIN login', () async {
-      final b = _Backend(422,
-          '{"message":"Wrong","code":"wrong_mpin","attemptsLeft":2}');
-      await expectLater(
-        b.auth.login(
-            phone: '9171234567', verificationToken: 'v-1', mpin: '4828'),
-        throwsA(isA<AuthException>()
-            .having((e) => e.error, 'error', AuthError.wrongMpin)
-            .having((e) => e.message, 'message',
-                startsWith('Your MPIN is incorrect.'))),
-      );
+      // Signing up never signs in: the address has to be confirmed first.
       expect(b.api.token, isNull);
+      expect(await const AuthStorage().readToken(), isNull);
     });
 
-    test('locked MPIN', () {
-      final b = _Backend(423, '{"message":"Locked","code":"mpin_locked"}');
-      expect(
-        b.auth.login(
-            phone: '9171234567', verificationToken: 'v-1', mpin: '4828'),
-        _authError(AuthError.mpinLocked),
-      );
-    });
-
-    test('Forgot MPIN resets without signing in', () async {
-      final b = _Backend(200, '{"ok":true}');
-      await b.auth.resetMpin(
-          phone: '9171234567', verificationToken: 'v-1', mpin: '5190');
-      expect(b.last!.url.path, '/api/mobile/auth/mpin/reset');
-      expect(b.api.token, isNull);
-    });
-
-    test('a used or old verification token', () {
+    test('an address that already has an account', () {
       final b = _Backend(
-          422, '{"message":"Expired","code":"verification_expired"}');
+          409, '{"message":"Taken","code":"already_registered"}');
       expect(
-        b.auth.resetMpin(
-            phone: '9171234567', verificationToken: 'v-1', mpin: '5190'),
-        _authError(AuthError.verificationExpired),
+        b.auth.register(
+          name: const RegistrationName(
+            firstName: 'Rosela',
+            middleName: 'Santos',
+            lastName: 'Mabuhay',
+            suffix: '',
+            noMiddleName: false,
+          ),
+          email: 'ana@example.com',
+          password: 'Tahimik-2026',
+        ),
+        _authError(AuthError.alreadyRegistered),
+      );
+    });
+
+    test('a password the backend refuses', () {
+      final b =
+          _Backend(422, '{"message":"Too short","code":"invalid_password"}');
+      expect(
+        b.auth.register(
+          name: const RegistrationName(
+            firstName: 'Rosela',
+            middleName: 'Santos',
+            lastName: 'Mabuhay',
+            suffix: '',
+            noMiddleName: false,
+          ),
+          email: 'ana@example.com',
+          password: 'short',
+        ),
+        _authError(AuthError.invalidPassword),
+      );
+    });
+
+    test('the confirmation email could not be sent', () {
+      final b = _Backend(503, '{"message":"No mail","code":"email_failed"}');
+      expect(
+        b.auth.register(
+          name: const RegistrationName(
+            firstName: 'Rosela',
+            middleName: 'Santos',
+            lastName: 'Mabuhay',
+            suffix: '',
+            noMiddleName: false,
+          ),
+          email: 'ana@example.com',
+          password: 'Tahimik-2026',
+        ),
+        _authError(AuthError.emailFailed),
       );
     });
   });
+
+  group('log in', () {
+    test('sends the address and password, and saves the session token',
+        () async {
+      final b = _Backend(200, '{"token":"2|secret"}');
+      await b.auth.login(email: 'ana@example.com', password: 'Tahimik-2026');
+
+      expect(b.last!.url.path, '/api/mobile/auth/login');
+      expect(b.sent, {
+        'email': 'ana@example.com',
+        'password': 'Tahimik-2026',
+      });
+      expect(b.api.token, '2|secret');
+      expect(await const AuthStorage().readToken(), '2|secret');
+    });
+
+    test('a wrong address or password reads the same either way', () async {
+      final b = _Backend(422,
+          '{"message":"Incorrect email or password.","code":"invalid_credentials"}');
+      await expectLater(
+        b.auth.login(email: 'ana@example.com', password: 'nope-nope-1'),
+        throwsA(isA<AuthException>()
+            .having((e) => e.error, 'error', AuthError.invalidCredentials)
+            .having((e) => e.message, 'message',
+                'Incorrect email or password.')),
+      );
+      expect(b.api.token, isNull);
+    });
+
+    test('an address that was never confirmed, with the address to show', () {
+      final b = _Backend(
+          403,
+          '{"message":"Confirm first","code":"email_not_verified",'
+              '"email":"ana@example.com"}');
+      expect(
+        b.auth.login(email: 'ana@example.com', password: 'Tahimik-2026'),
+        throwsA(isA<AuthException>()
+            .having((e) => e.error, 'error', AuthError.emailNotVerified)
+            .having((e) => e.email, 'email', 'ana@example.com')),
+      );
+    });
+
+    test('too many wrong passwords locks the account', () {
+      final b = _Backend(423,
+          '{"message":"Locked","code":"account_locked","retryAfter":900}');
+      expect(
+        b.auth.login(email: 'ana@example.com', password: 'nope-nope-1'),
+        throwsA(isA<AuthException>()
+            .having((e) => e.error, 'error', AuthError.accountLocked)
+            .having((e) => e.retryAfter, 'retryAfter',
+                const Duration(minutes: 15))),
+      );
+    });
+
+    test('a deactivated account', () {
+      final b = _Backend(
+          403, '{"message":"Off","code":"account_deactivated"}');
+      expect(
+        b.auth.login(email: 'ana@example.com', password: 'Tahimik-2026'),
+        _authError(AuthError.accountDeactivated),
+      );
+    });
+  });
+
+  group('resend the confirmation email', () {
+    test('needs the password, and says when it was already confirmed',
+        () async {
+      final b = _Backend(200, '{"ok":true,"alreadyVerified":true}');
+      final already = await b.auth.resendVerification(
+        email: 'ana@example.com',
+        password: 'Tahimik-2026',
+      );
+
+      expect(b.last!.url.path, '/api/mobile/auth/verification/resend');
+      expect(b.sent, {
+        'email': 'ana@example.com',
+        'password': 'Tahimik-2026',
+      });
+      expect(already, isTrue);
+    });
+
+    test('still waiting to be confirmed', () async {
+      final b = _Backend(200, '{"ok":true,"alreadyVerified":false}');
+      expect(
+        await b.auth.resendVerification(
+          email: 'ana@example.com',
+          password: 'Tahimik-2026',
+        ),
+        isFalse,
+      );
+    });
+
+    test('a wrong password is refused, so nobody else can make us send', () {
+      final b = _Backend(
+          422, '{"message":"No","code":"invalid_credentials"}');
+      expect(
+        b.auth.resendVerification(
+          email: 'ana@example.com',
+          password: 'guessing',
+        ),
+        _authError(AuthError.invalidCredentials),
+      );
+    });
+  });
+
+  group('forgot password', () {
+    test('asks for the link and keeps no session', () async {
+      final b = _Backend(200, '{"ok":true,"expiresInMinutes":30}');
+      await b.auth.forgotPassword(email: 'ana@example.com');
+
+      expect(b.last!.url.path, '/api/mobile/auth/password/forgot');
+      expect(b.sent, {'email': 'ana@example.com'});
+      expect(b.api.token, isNull);
+    });
+
+    test('an address with no account answers the same as one with', () async {
+      final b = _Backend(200, '{"ok":true,"expiresInMinutes":30}');
+      await b.auth.forgotPassword(email: 'nobody@example.com');
+      expect(b.last!.url.path, '/api/mobile/auth/password/forgot');
+    });
+
+    test('the email could not be sent', () {
+      final b = _Backend(503, '{"message":"No mail","code":"email_failed"}');
+      expect(
+        b.auth.forgotPassword(email: 'ana@example.com'),
+        _authError(AuthError.emailFailed),
+      );
+    });
+  });
+
+  group('change the password', () {
+    test('sends both passwords', () async {
+      final b = _Backend(200, '{"ok":true}');
+      await b.auth.changePassword(
+        currentPassword: 'Tahimik-2026',
+        password: 'Bag-ong-Password-9',
+      );
+
+      expect(b.last!.url.path, '/api/mobile/auth/password/change');
+      expect(b.sent, {
+        'currentPassword': 'Tahimik-2026',
+        'password': 'Bag-ong-Password-9',
+      });
+    });
+
+    test('a wrong current password', () {
+      final b = _Backend(
+          422, '{"message":"No","code":"invalid_credentials"}');
+      expect(
+        b.auth.changePassword(
+          currentPassword: 'wrong-wrong-1',
+          password: 'Bag-ong-Password-9',
+        ),
+        _authError(AuthError.invalidCredentials),
+      );
+    });
+  });
+
 
   group('session', () {
     test('a valid session', () async {
@@ -316,11 +345,25 @@ void main() {
   test('without a backend nobody can sign in', () async {
     const auth = UnavailableAuthService();
     await expectLater(
-      auth.requestOtp(phone: '9171234567', flow: AuthFlow.login),
+      auth.login(email: 'ana@example.com', password: 'Tahimik-2026'),
       _authError(AuthError.unavailable),
     );
     await expectLater(
-      auth.verifyOtp(phone: '9171234567', code: '9109', flow: AuthFlow.login),
+      auth.register(
+        name: const RegistrationName(
+          firstName: 'Rosela',
+          middleName: 'Santos',
+          lastName: 'Mabuhay',
+          suffix: '',
+          noMiddleName: false,
+        ),
+        email: 'ana@example.com',
+        password: 'Tahimik-2026',
+      ),
+      _authError(AuthError.unavailable),
+    );
+    await expectLater(
+      auth.forgotPassword(email: 'ana@example.com'),
       _authError(AuthError.unavailable),
     );
     expect(await auth.checkSession(), SessionStatus.none);
