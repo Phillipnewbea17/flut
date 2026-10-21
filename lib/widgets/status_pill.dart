@@ -4,6 +4,7 @@ import '../app_state/accessibility_provider.dart';
 import '../models/application_status.dart';
 import '../models/document_item.dart';
 import '../models/identity_verification.dart';
+import '../models/pension_record.dart';
 import '../models/senior_id.dart';
 import '../models/service_request.dart';
 import '../models/user_profile.dart';
@@ -142,6 +143,18 @@ class StatusLook {
       case SeniorIdStatus.inactive:
         return StatusLook(Icons.block, AppColors.danger, label);
     }
+  }
+
+  /// A pension release, in the office's words (Released, Pending, On Hold).
+  static StatusLook pension(PensionRecord record) {
+    final label = record.status;
+    if (record.isReleased) {
+      return StatusLook(Icons.check_circle, AppColors.success, label);
+    }
+    if (record.isOnHold) {
+      return StatusLook(Icons.pause_circle_outline, AppColors.warning, label);
+    }
+    return StatusLook(Icons.schedule, AppColors.textSecondary, label);
   }
 }
 

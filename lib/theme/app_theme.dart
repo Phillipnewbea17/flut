@@ -94,7 +94,7 @@ class AppTheme {
     );
   }
 
-  /// Green top bar used by every sub page (Calculator, FAQ, and so on).
+  /// Green top bar used by every sub page (FAQ, and so on).
   static AppBar appBar(
     String title, {
     List<Widget>? actions,

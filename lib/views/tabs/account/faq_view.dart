@@ -55,8 +55,8 @@ class FaqView extends StatelessWidget {
     ),
     (
       'The store did not give my discount. What can I do?',
-      'Go to Benefits & services and tap "Report a store". The OSCA office '
-          'can follow it up.',
+      'On Home, tap Help & Complaints, then choose "Discount problem". The '
+          'OSCA office can follow it up.',
     ),
     (
       'Can I make the letters bigger?',

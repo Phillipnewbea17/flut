@@ -26,9 +26,6 @@ dependencies:
   flutter_secure_storage: ^9.2.2
   path_provider: ^2.1.4
 
-  # Hashing the MPIN before it is stored (AuthStorage)
-  crypto: ^3.0.6
-
   # SVG illustrations (welcome slides). 2.0.17+ is needed for errorBuilder.
   flutter_svg: ^2.0.17
 
@@ -69,7 +66,7 @@ flutter:
 
   assets:
     - assets/illustrations/ # your SVG illustrations
-    - assets/data/          # benefits and places guides (no user data)
+    - assets/data/          # the places guide (no user data)
     - lib/l10n/             # translations: English, Filipino, Cebuano
 
   fonts:

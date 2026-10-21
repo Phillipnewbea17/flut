@@ -109,9 +109,8 @@ address the app sends nothing and pretends nothing.
 gets the account's own records, and only what is meant for the senior
 (status, dates and the office's answer; no staff notes or amounts).
 
-Only the benefits/discounts guide and the places list are read from
-`assets/data/` (reference content shipped with the app; the backend has
-no tables for them).
+Only the places list is read from `assets/data/` (reference content
+shipped with the app; the backend has no tables for it).
 
 `GET /application` may also send per-paper results, so the app can
 say which paper needs fixing (`DocumentReview` in
@@ -137,9 +136,8 @@ Without it, the app shows the office's note for the whole application.
 Plain `flutter run` (no API_BASE_URL) uses only the files below.
 
 ## 6. Guides shipped with the app
-Only these two files in `assets/data/` are read by the app:
+Only this file in `assets/data/` is read by the app:
 
-- `benefits.json`: the benefits and discounts guide
 - `places.json`: Local Guide places. The coordinates are approximate,
   so replace them with your verified list.
 

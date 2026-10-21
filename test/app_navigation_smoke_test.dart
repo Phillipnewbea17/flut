@@ -17,12 +17,13 @@ import 'package:my_senior_app/repositories/requests_repository.dart';
 import 'package:my_senior_app/repositories/user_repository.dart';
 import 'package:my_senior_app/repositories/wallet_repository.dart';
 import 'package:my_senior_app/routes/app_router.dart';
+import 'package:my_senior_app/services/announcements_service.dart';
 import 'package:my_senior_app/services/api_client.dart';
-import 'package:my_senior_app/services/benefits_service.dart';
 import 'package:my_senior_app/services/identity_service.dart';
 import 'package:my_senior_app/services/document_service.dart';
 import 'package:my_senior_app/services/pension_service.dart';
 import 'package:my_senior_app/services/places_service.dart';
+import 'package:my_senior_app/services/profile_photo_store.dart';
 import 'package:my_senior_app/services/requests_service.dart';
 import 'package:my_senior_app/services/sos_service.dart';
 import 'package:my_senior_app/services/wallet_service.dart';
@@ -110,10 +111,11 @@ Future<GoRouter> _startApp(WidgetTester tester, {double textScale = 1}) async {
           ),
           Provider.value(
               value: PlacesRepository(service: PlacesService(api), db: db)),
-          Provider.value(value: BenefitsService(api)),
+          Provider.value(value: AnnouncementsService(api)),
           Provider.value(value: PensionService(api)),
           Provider.value(value: SosService()),
           Provider.value(value: ImageCompressor()),
+          Provider.value(value: ProfilePhotoStore()),
         ],
         child: MaterialApp.router(
           theme: AppTheme.light(),
@@ -174,7 +176,7 @@ void main() {
     final tabTitles = {
       'Applications': 'My application',
       'My ID': 'My Senior Citizen ID',
-      'Benefits': 'My pension',
+      'Benefits': 'Your pension releases',
       'Account': 'Personal information',
     };
     for (final entry in tabTitles.entries) {
@@ -184,6 +186,21 @@ void main() {
       expect(find.textContaining(entry.value, findRichText: true), findsWidgets,
           reason: entry.key);
     }
+
+    // No backend: Benefits says it could not load, never "no pension yet".
+    await tester.tap(find.text('Benefits').last);
+    await _settle(tester);
+    expect(find.text('My pension'), findsOneWidget);
+    expect(find.textContaining('Could not load your pension records'),
+        findsOneWidget);
+    expect(find.textContaining('No pension released yet'), findsNothing);
+
+    // The discount tools were removed from Account.
+    await tester.tap(find.text('Account').last);
+    await _settle(tester);
+    expect(find.text('Discounts'), findsNothing);
+    expect(find.text('Discount calculator'), findsNothing);
+    expect(find.text('Report a store'), findsNothing);
 
     // Every page opened from the tabs builds without errors.
     for (final page in [
@@ -196,14 +213,11 @@ void main() {
       Routes.burialNew,
       Routes.help,
       Routes.helpNew,
-      Routes.reportViolation,
       Routes.requests,
       Routes.idServices,
       Routes.qrCashier,
       Routes.idDetails,
       Routes.idReplacement,
-      Routes.benefits,
-      Routes.calculator,
       Routes.notifications,
       Routes.announcements,
       Routes.family,
