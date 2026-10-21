@@ -7,6 +7,7 @@ import 'package:provider/provider.dart';
 
 import '../../../models/service_request.dart';
 import '../../../repositories/requests_repository.dart';
+import '../../../routes/app_router.dart';
 import '../../../theme/app_colors.dart';
 import '../../../theme/app_theme.dart';
 import '../../../widgets/big_button.dart';
@@ -158,6 +159,17 @@ class _RequestDetailViewState extends State<RequestDetailView> {
                 icon: Icons.forum_outlined,
                 title: 'Latest response from the OSCA office',
                 text: request.latestResponse,
+              ),
+            ],
+            // Approved: the certificate to bring to the office.
+            if (request.certificate != null) ...[
+              const SizedBox(height: 16),
+              BigButton(
+                label: request.certificate!.isClaimed
+                    ? 'See the claimed certificate'
+                    : 'Show my certificate',
+                icon: Icons.workspace_premium_outlined,
+                onPressed: () => context.push(Routes.certificate(request.id)),
               ),
             ],
             if (!request.isSent) ...[

@@ -2,7 +2,6 @@ import 'package:flutter/widgets.dart';
 import 'package:go_router/go_router.dart';
 
 import '../app_state/session_provider.dart';
-import '../models/benefit.dart';
 import '../models/help_category.dart';
 import '../models/onboarding_stage.dart';
 import '../models/personal_info.dart';
@@ -39,17 +38,15 @@ import '../views/tabs/applications/application_status_view.dart';
 import '../views/tabs/applications/applications_view.dart';
 import '../views/tabs/applications/assistance_view.dart';
 import '../views/tabs/applications/burial_request_form_view.dart';
+import '../views/tabs/applications/certificate_view.dart';
 import '../views/tabs/applications/id_photo_capture_view.dart';
 import '../views/tabs/applications/medical_request_form_view.dart';
 import '../views/tabs/applications/request_detail_view.dart';
 import '../views/tabs/applications/request_history_view.dart';
 import '../views/tabs/applications/requests_hub_view.dart';
 import '../views/tabs/applications/upload_documents_view.dart';
-import '../views/tabs/benefits/benefits_services_view.dart';
 import '../views/tabs/benefits/benefits_tab_view.dart';
-import '../views/tabs/benefits/senior_calculator_view.dart';
 import '../views/tabs/help/help_request_form_view.dart';
-import '../views/tabs/help/report_violation_view.dart';
 import '../views/tabs/home/announcements_view.dart';
 import '../views/tabs/home/home_dashboard_view.dart';
 import '../views/tabs/home/notifications_view.dart';
@@ -168,12 +165,15 @@ class Routes {
   static const String burialNew = '/burial/new';
   static const String help = '/help';
   static const String helpNew = '/help/new';
-  static const String reportViolation = '/help/report-store';
   static const String requests = '/requests';
 
   /// One request. [justSent] shows the "sent / not sent" message on top.
   static String request(String id, {bool justSent = false}) =>
       '/requests/${Uri.encodeComponent(id)}${justSent ? '?new=1' : ''}';
+
+  /// The Certificate of Eligibility of an approved request (id or reference).
+  static String certificate(String id) =>
+      '/requests/${Uri.encodeComponent(id)}/certificate';
 
   /// Help & complaints form, optionally with the concern type chosen.
   static String helpNewFor(HelpCategory category) =>
@@ -185,14 +185,8 @@ class Routes {
   static const String idDetails = '/id/details';
   static const String idReplacement = '/id/replacement';
 
-  // Benefits
-  static const String benefits = '/benefits/list';
-  static const String calculator = '/benefits/calculator';
+  // Local Guide
   static const String localGuide = '/benefits/local-guide';
-
-  /// Benefits list showing one category (e.g. pension).
-  static String benefitsFor(BenefitCategory category) =>
-      '$benefits?category=${category.name}';
 
   // Account
   static const String personalInfo = '/account/personal';
@@ -379,7 +373,6 @@ class AppRouter {
             ),
           ),
         ),
-        _page(Routes.reportViolation, (_) => const ReportViolationView()),
         _page(Routes.requests, (_) => const RequestHistoryView()),
         _page(
           '${Routes.requests}/:id',
@@ -388,6 +381,10 @@ class AppRouter {
             justSent: state.uri.queryParameters['new'] == '1',
           ),
         ),
+        _page(
+          '${Routes.requests}/:id/certificate',
+              (state) => CertificateView(id: state.pathParameters['id'] ?? ''),
+        ),
 
         // Senior ID
         _page(Routes.idServices, (_) => const IdServicesView()),
@@ -395,16 +392,7 @@ class AppRouter {
         _page(Routes.idDetails, (_) => const IdDetailsView()),
         _page(Routes.idReplacement, (_) => const IdReplacementView()),
 
-        // Benefits
-        _page(
-          Routes.benefits,
-              (state) => BenefitsServicesView(
-            initialFilter: BenefitCategoryInfo.tryParse(
-              state.uri.queryParameters['category'],
-            ),
-          ),
-        ),
-        _page(Routes.calculator, (_) => const SeniorCalculatorView()),
+        // Local Guide
         _page(Routes.localGuide, (_) => const LocalGuidePage()),
 
         // Account

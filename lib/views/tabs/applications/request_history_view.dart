@@ -153,6 +153,13 @@ class _RequestList extends StatelessWidget {
             ),
             const SizedBox(height: 12),
           ],
+          if (repo.notLinked) ...[
+            const Text(
+              RequestsRepository.notLinkedMessage,
+              style: TextStyle(fontSize: 16, color: AppColors.textSecondary),
+            ),
+            const SizedBox(height: 12),
+          ],
           if (items.isEmpty)
             Padding(
               padding: const EdgeInsets.only(top: 32),

@@ -1,11 +1,18 @@
 import 'package:flutter/material.dart';
 
+import '../utils/manila_time.dart';
+import 'assistance_certificate.dart';
+
 /// Requests a senior sends to the OSCA office from the app. Each kind
 /// matches a module of the SCMS web app, where staff process it:
 ///   medical       -> Medical Requests
 ///   burial        -> Burial Requests
 ///   help          -> Help & Complaint Desk
 ///   idReplacement -> Senior ID Management ("Request replacement")
+///
+/// Medical and burial end in a Certificate of Eligibility once the office
+/// approves them (see [ServiceRequest.certificate]). Pension is not
+/// requested: only the office issues it (Benefits shows the releases).
 enum RequestKind { medical, burial, help, idReplacement }
 
 extension RequestKindInfo on RequestKind {
@@ -90,10 +97,11 @@ extension RequestStatusInfo on RequestStatus {
       this == RequestStatus.approved;
 
   /// Status words from the SCMS web modules:
-  ///   Medical:   Pending, Approved, Completed, On Hold
-  ///   Burial:    Pending, Approved, Released, On Hold
+  ///   Medical, Burial: Pending, On Hold, Approved (certificate issued),
+  ///              Declined, Claimed (collected at the office)
   ///   Help Desk: Pending, Working on it, Resolved, Closed
   ///   Senior ID: For Replacement (the request is open)
+  /// Older words (Completed, Released) still read as completed.
   static RequestStatus parse(String? value) {
     switch ((value ?? '').trim().toLowerCase()) {
       case 'notsent':
@@ -110,11 +118,13 @@ extension RequestStatusInfo on RequestStatus {
         return RequestStatus.approved;
       case 'completed':
       case 'released':
+      case 'claimed':
       case 'resolved':
       case 'replaced':
         return RequestStatus.completed;
       case 'rejected':
       case 'denied':
+      case 'declined':
         return RequestStatus.rejected;
       case 'closed':
       case 'cancelled':
@@ -202,7 +212,7 @@ class RequestEvent {
   Map<String, dynamic> toJson() => {'date': date.toIso8601String(), 'note': note};
 
   factory RequestEvent.fromJson(Map<String, dynamic> json) => RequestEvent(
-        date: DateTime.tryParse(json['date'] as String? ?? '') ?? DateTime.now(),
+        date: parseServerTime(json['date'] as String?) ?? DateTime.now(),
         note: json['note'] as String? ?? '',
       );
 }
@@ -241,6 +251,10 @@ class ServiceRequest {
   /// Why the last try to send failed, if it did.
   final String? sendError;
 
+  /// Medical and burial: the Certificate of Eligibility, once the office
+  /// approved the request. Null before that (and for other kinds).
+  final AssistanceCertificate? certificate;
+
   const ServiceRequest({
     required this.id,
     required this.kind,
@@ -257,6 +271,7 @@ class ServiceRequest {
     this.latestResponse = '',
     this.history = const [],
     this.sendError,
+    this.certificate,
   });
 
   bool get isSent => status != RequestStatus.notSent;
@@ -281,6 +296,7 @@ class ServiceRequest {
         return RequestDisplayStatus.approved;
       case 'rejected':
       case 'denied':
+      case 'declined':
       case 'not approved':
         return RequestDisplayStatus.rejected;
       case 'cancelled':
@@ -361,6 +377,7 @@ class ServiceRequest {
       latestResponse: latestResponse ?? this.latestResponse,
       history: history ?? this.history,
       sendError: sendError == null ? this.sendError : sendError(),
+      certificate: certificate,
     );
   }
 
@@ -382,6 +399,7 @@ class ServiceRequest {
       updatedAt: server.updatedAt ?? updatedAt,
       latestResponse: server.latestResponse,
       history: server.history.isNotEmpty ? server.history : history,
+      certificate: server.certificate,
     );
   }
 
@@ -401,13 +419,15 @@ class ServiceRequest {
         'latestResponse': latestResponse,
         'history': history.map((e) => e.toJson()).toList(),
         'sendError': sendError,
+        'certificate': certificate?.toJson(),
       };
 
   /// Reads both the copy saved on the phone and the backend's answer:
   ///   {"clientId": "...", "reference": "MA-2026-0012", "status": "Pending",
   ///    "title": "Medicine", "submittedAt": "...", "updatedAt": "...",
   ///    "latestResponse": "...", "details": [{"label": "", "value": ""}],
-  ///    "history": [{"date": "...", "note": "..."}]}
+  ///    "history": [{"date": "...", "note": "..."}],
+  ///    "certificate": {...} or null (see AssistanceCertificate)}
   factory ServiceRequest.fromJson(
     Map<String, dynamic> json, {
     RequestKind? kind,
@@ -433,14 +453,15 @@ class ServiceRequest {
           : const {},
       attachments: (json['attachments'] as List?)?.whereType<String>().toList() ??
           const [],
-      createdAt: DateTime.tryParse(json['createdAt'] as String? ?? '') ??
-          DateTime.tryParse(json['submittedAt'] as String? ?? '') ??
+      createdAt: parseServerTime(json['createdAt'] as String?) ??
+          parseServerTime(json['submittedAt'] as String?) ??
           DateTime.now(),
-      submittedAt: DateTime.tryParse(json['submittedAt'] as String? ?? ''),
-      updatedAt: DateTime.tryParse(json['updatedAt'] as String? ?? ''),
+      submittedAt: parseServerTime(json['submittedAt'] as String?),
+      updatedAt: parseServerTime(json['updatedAt'] as String?),
       latestResponse: json['latestResponse'] as String? ?? '',
       history: _list(json['history'], RequestEvent.fromJson),
       sendError: json['sendError'] as String?,
+      certificate: AssistanceCertificate.fromJson(json['certificate']),
     );
   }
 

@@ -35,12 +35,16 @@ class PillButton extends StatelessWidget {
             child: Row(
               mainAxisSize: MainAxisSize.min,
               children: [
-                Text(
-                  label,
-                  style: const TextStyle(
-                    color: AppColors.primary,
-                    fontSize: 17,
-                    fontWeight: FontWeight.w700,
+                // Flexible: on a narrow phone or with big text the label
+                // wraps inside the pill instead of running past its edge.
+                Flexible(
+                  child: Text(
+                    label,
+                    style: const TextStyle(
+                      color: AppColors.primary,
+                      fontSize: 17,
+                      fontWeight: FontWeight.w700,
+                    ),
                   ),
                 ),
                 const SizedBox(width: 8),

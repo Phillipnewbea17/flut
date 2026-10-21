@@ -8,7 +8,8 @@ import '../../../theme/app_theme.dart';
 import '../../../widgets/info_card.dart';
 
 /// "Assistance" (Home quick action): choose Medical or Burial. Each card
-/// opens that kind's existing screen.
+/// opens that kind's existing screen. An approved request gets a
+/// certificate to claim the assistance at the OSCA office.
 class AssistanceView extends StatelessWidget {
   const AssistanceView({super.key});
 

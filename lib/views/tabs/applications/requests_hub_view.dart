@@ -83,11 +83,29 @@ class RequestsHubView extends StatelessWidget {
               ),
             ),
             const SizedBox(height: 16),
-            BigButton(
-              label: _newLabel,
-              icon: Icons.add,
-              onPressed: () => context.push(_newRoute),
-            ),
+            // Requests need the account's senior citizen record, which the
+            // OSCA office links when it approves the application. Until then
+            // a form would only end in "not sent", so the way forward is
+            // shown instead.
+            if (repo.notLinked) ...[
+              const NoticeCard(
+                icon: Icons.hourglass_top,
+                title: 'Not available yet',
+                text: RequestsRepository.notLinkedMessage,
+              ),
+              const SizedBox(height: 12),
+              BigButton(
+                label: 'View my application',
+                icon: Icons.description_outlined,
+                style: BigButtonStyle.tonal,
+                onPressed: () => context.push(Routes.applicationStatus),
+              ),
+            ] else
+              BigButton(
+                label: _newLabel,
+                icon: Icons.add,
+                onPressed: () => context.push(_newRoute),
+              ),
             if (!repo.isAvailable(kind)) ...[
               const SizedBox(height: 16),
               NoticeCard.notConnected(
