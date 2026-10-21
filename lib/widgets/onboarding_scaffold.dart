@@ -173,7 +173,9 @@ class GreenHeaderStack extends StatelessWidget {
   }
 }
 
-/// The round heart logo.
+/// The app logo: a white rocking chair with a heart on a green rounded
+/// square (the same picture as the launcher icon). Decorative, so screen
+/// readers skip it.
 class AppLogo extends StatelessWidget {
   final double size;
 
@@ -181,18 +183,11 @@ class AppLogo extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
-    return Container(
+    return Image.asset(
+      'assets/illustrations/app-logo.png',
       width: size,
       height: size,
-      decoration: const BoxDecoration(
-        color: AppColors.primaryLight,
-        shape: BoxShape.circle,
-      ),
-      child: Icon(
-        Icons.favorite_outline,
-        color: AppColors.primary,
-        size: size * 0.57,
-      ),
+      excludeFromSemantics: true,
     );
   }
 }

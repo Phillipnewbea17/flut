@@ -6,6 +6,7 @@ import 'package:provider/provider.dart';
 
 import '../../app_state/session_provider.dart';
 import '../../theme/app_colors.dart';
+import '../../widgets/onboarding_scaffold.dart';
 
 /// First screen while the app wakes up. Shows the logo for a moment, then
 /// tells the session it is done. The router decides where to go next.
@@ -49,19 +50,7 @@ class _SplashLoadingViewState extends State<SplashLoadingView> {
                   child: Column(
                     mainAxisSize: MainAxisSize.min,
                     children: [
-                      Container(
-                        width: 112,
-                        height: 112,
-                        decoration: const BoxDecoration(
-                          color: AppColors.primaryLight,
-                          shape: BoxShape.circle,
-                        ),
-                        child: const Icon(
-                          Icons.favorite_outline,
-                          color: AppColors.primary,
-                          size: 64,
-                        ),
-                      ),
+                      const AppLogo(size: 112),
                       const SizedBox(height: 24),
                       const Text(
                         'SeniorCompanion',
