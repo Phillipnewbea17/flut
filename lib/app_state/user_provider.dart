@@ -146,6 +146,8 @@ class UserProvider extends ChangeNotifier {
       fullName: keep(info.fullName, base.fullName),
       role: UserRole.senior,
       birthDate: info.birthDate ?? base.birthDate,
+      // The purok / street from Change Address (addressLine on the server).
+      street: keep(info.addressLine, base.street),
       barangay: keep(info.barangay, base.barangay),
       municipality: keep(info.municipality, base.municipality),
       province: keep(info.province, base.province),

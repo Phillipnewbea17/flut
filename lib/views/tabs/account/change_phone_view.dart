@@ -61,8 +61,18 @@ class _ChangePhoneViewState extends State<ChangePhoneView> {
     });
 
     final updated = profile.copyWith(phone: digits);
+    // The OSCA office calls this number, so it only counts as saved once the
+    // server has it. Offline, nothing changes and the senior is told why.
+    final problem = await users.syncProfile(updated);
+    if (!mounted) return;
+    if (problem != null) {
+      setState(() {
+        _saving = false;
+        _error = problem;
+      });
+      return;
+    }
     await user.updateProfile(updated);
-    await users.syncProfile(updated);
     if (!mounted) return;
     setState(() => _saving = false);
     ScaffoldMessenger.of(context).showSnackBar(

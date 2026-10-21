@@ -5,9 +5,16 @@ import 'api_client.dart';
 /// Why a sign-in step failed. Each one has its own plain-words message.
 enum AuthError {
   invalidName,
+
+  /// Each part of the name fits, but together they are longer than the
+  /// account can hold.
+  nameTooLong,
   invalidEmail,
   invalidPassword,
   weakPassword,
+
+  /// Change Password: the new password is the current one.
+  samePassword,
   passwordMismatch,
   alreadyRegistered,
 
@@ -23,6 +30,10 @@ enum AuthError {
   accountDeactivated,
   sessionExpired,
   emailFailed,
+
+  /// Too many tries in a short time (HTTP 429). Nothing typed was wrong:
+  /// the senior only has to wait a moment.
+  tooManyAttempts,
   unavailable,
   network,
   server,
@@ -46,12 +57,17 @@ class AuthException implements Exception {
 
   String get message => switch (error) {
         AuthError.invalidName => 'Please check your name. Use letters only.',
+        AuthError.nameTooLong =>
+          'Your name is too long. Please use a shorter form of it.',
         AuthError.invalidEmail =>
           'Please enter your email address, like rosela@gmail.com.',
         AuthError.invalidPassword =>
           'Please use a password of at least 8 characters.',
         AuthError.weakPassword =>
           'This password is too easy to guess. Please choose another one.',
+        AuthError.samePassword =>
+          'Please choose a new password that is different from your current '
+              'one.',
         AuthError.passwordMismatch =>
           'The passwords do not match. Please type them again.',
         AuthError.alreadyRegistered =>
@@ -68,6 +84,8 @@ class AuthException implements Exception {
           'Your session has ended. Please log in again.',
         AuthError.emailFailed =>
           'We could not send the email right now. Please try again later.',
+        AuthError.tooManyAttempts =>
+          'Too many tries. Please wait a minute and try again.',
         AuthError.unavailable => 'Signing in is not available right now. '
             'Please contact the OSCA office for help.',
         AuthError.network =>
@@ -281,15 +299,18 @@ class ApiAuthService implements AuthService {
 
     final error = switch (code) {
       'invalid_name' => AuthError.invalidName,
+      'name_too_long' => AuthError.nameTooLong,
       'invalid_email' => AuthError.invalidEmail,
       'invalid_password' => AuthError.invalidPassword,
       'weak_password' => AuthError.weakPassword,
+      'same_password' => AuthError.samePassword,
       'already_registered' => AuthError.alreadyRegistered,
       'invalid_credentials' => AuthError.invalidCredentials,
       'email_not_verified' => AuthError.emailNotVerified,
       'account_locked' || 'locked' => AuthError.accountLocked,
       'account_deactivated' => AuthError.accountDeactivated,
       'email_failed' => AuthError.emailFailed,
+      'too_many_attempts' => AuthError.tooManyAttempts,
       _ => null,
     };
     if (error != null) {
@@ -297,8 +318,10 @@ class ApiAuthService implements AuthService {
     }
     if (status == null) return const AuthException(AuthError.network);
     if (status == 401) return const AuthException(AuthError.sessionExpired);
+    // Rate limited without a code (an older backend): still only a wait,
+    // never "check your details".
     if (status == 429) {
-      return AuthException(AuthError.unknown, retryAfter: retry);
+      return AuthException(AuthError.tooManyAttempts, retryAfter: retry);
     }
     // Laravel answers 404 without a "code" when a route does not exist.
     if (status == 404 || status == 405) {

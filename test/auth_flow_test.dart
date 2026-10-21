@@ -143,6 +143,18 @@ void main() {
           RegistrationName.validate(named('Rosela', '3rd!')), contains('suffix'));
     });
 
+    test('each part may be long, but not the whole name', () {
+      final part = 'a' * RegistrationName.maxNameLength;
+      final errors = RegistrationName.validate(RegistrationName(
+          firstName: part,
+          middleName: part,
+          lastName: part,
+          suffix: '',
+          noMiddleName: false));
+      expect(errors['lastName'], contains('too long'));
+      expect(errors.keys, ['lastName']);
+    });
+
     test('a bad name never leaves the name step', () async {
       final errors = await registration.saveName(const RegistrationName(
           firstName: '',
@@ -487,12 +499,14 @@ void main() {
     test('change password checks the current one with the backend', () async {
       await signUpAndLogIn();
 
+      // This screen has no email box, so the answer names only the
+      // password.
       expect(
         await session.changePassword(
           currentPassword: 'Wrong-Password-1',
           newPassword: 'Bag-ong-Password-9',
         ),
-        'Incorrect email or password.',
+        SessionProvider.wrongCurrentPassword,
       );
       expect(backend.passwords[_email], _password);
 

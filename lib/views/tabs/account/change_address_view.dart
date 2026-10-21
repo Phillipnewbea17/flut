@@ -25,6 +25,9 @@ class _ChangeAddressViewState extends State<ChangeAddressView> {
   final TextEditingController _town = TextEditingController();
   final TextEditingController _province = TextEditingController();
   String? _error;
+
+  /// Why the server did not save the address (no connection...).
+  String? _saveError;
   bool _saving = false;
 
   @override
@@ -58,6 +61,7 @@ class _ChangeAddressViewState extends State<ChangeAddressView> {
     setState(() {
       _saving = true;
       _error = null;
+      _saveError = null;
     });
     final updated = profile.copyWith(
       street: _street.text.trim(),
@@ -65,8 +69,19 @@ class _ChangeAddressViewState extends State<ChangeAddressView> {
       municipality: _town.text.trim(),
       province: _province.text.trim(),
     );
+    // The OSCA office goes by the address the server has, so it only counts
+    // as saved once the server has it. Offline, nothing changes and the
+    // senior is told why.
+    final problem = await users.syncProfile(updated);
+    if (!mounted) return;
+    if (problem != null) {
+      setState(() {
+        _saving = false;
+        _saveError = problem;
+      });
+      return;
+    }
     await user.updateProfile(updated);
-    await users.syncProfile(updated);
     if (!mounted) return;
     setState(() => _saving = false);
     ScaffoldMessenger.of(context).showSnackBar(
@@ -124,6 +139,11 @@ class _ChangeAddressViewState extends State<ChangeAddressView> {
                   hint: 'e.g. Bohol',
                   controller: _province,
                 ),
+                if (_saveError != null)
+                  Text(
+                    _saveError!,
+                    style: OnboardingScaffold.errorText,
+                  ),
               ],
             ),
           ),

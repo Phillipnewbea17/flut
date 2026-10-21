@@ -126,6 +126,24 @@ void main() {
         _authError(AuthError.emailFailed),
       );
     });
+
+    test('a name too long to save', () {
+      final b = _Backend(422, '{"message":"Long","code":"name_too_long"}');
+      expect(
+        b.auth.register(
+          name: const RegistrationName(
+            firstName: 'Rosela',
+            middleName: 'Santos',
+            lastName: 'Mabuhay',
+            suffix: '',
+            noMiddleName: false,
+          ),
+          email: 'ana@example.com',
+          password: 'Tahimik-2026',
+        ),
+        _authError(AuthError.nameTooLong),
+      );
+    });
   });
 
   group('log in', () {
@@ -187,6 +205,29 @@ void main() {
       expect(
         b.auth.login(email: 'ana@example.com', password: 'Tahimik-2026'),
         _authError(AuthError.accountDeactivated),
+      );
+    });
+
+    test('too many tries is a wait, never "check your details"', () {
+      final b = _Backend(
+          429,
+          '{"message":"Too many tries","code":"too_many_attempts",'
+              '"retryAfter":42}');
+      expect(
+        b.auth.login(email: 'ana@example.com', password: 'Tahimik-2026'),
+        throwsA(isA<AuthException>()
+            .having((e) => e.error, 'error', AuthError.tooManyAttempts)
+            .having((e) => e.retryAfter, 'retryAfter',
+                const Duration(seconds: 42))
+            .having((e) => e.message, 'message', contains('wait'))),
+      );
+    });
+
+    test('a 429 without a code is still a wait', () {
+      final b = _Backend(429, '{"message":"Too Many Attempts."}');
+      expect(
+        b.auth.login(email: 'ana@example.com', password: 'Tahimik-2026'),
+        _authError(AuthError.tooManyAttempts),
       );
     });
   });
@@ -281,6 +322,18 @@ void main() {
           password: 'Bag-ong-Password-9',
         ),
         _authError(AuthError.invalidCredentials),
+      );
+    });
+
+    test('the same password again', () {
+      final b = _Backend(
+          422, '{"message":"Same","code":"same_password"}');
+      expect(
+        b.auth.changePassword(
+          currentPassword: 'Tahimik-2026',
+          password: 'Tahimik-2026',
+        ),
+        _authError(AuthError.samePassword),
       );
     });
   });

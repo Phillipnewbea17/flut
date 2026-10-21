@@ -1,22 +1,3 @@
-/// Rules for the 4-digit one-time code (OTP) used by Forgot Password. The
-/// backend decides whether a code is right; this only stops input that can
-/// never be a code.
-class OtpValidator {
-  OtpValidator._();
-
-  static const int length = 4;
-
-  static final RegExp _digits = RegExp(r'^\d+$');
-
-  /// Returns null when [code] could be a code, otherwise a short message.
-  static String? validate(String code) {
-    if (code.isEmpty) return 'Please enter the 4-digit code.';
-    if (!_digits.hasMatch(code)) return 'Use numbers only.';
-    if (code.length != length) return 'Please enter all 4 numbers.';
-    return null;
-  }
-}
-
 /// Rules for the password a senior chooses. Length is what actually helps,
 /// so there are no symbol or mixed-case demands: a senior should not be
 /// fought with rules they cannot read. The backend applies the same rules;

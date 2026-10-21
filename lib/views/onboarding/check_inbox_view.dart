@@ -55,7 +55,8 @@ class _CheckInboxViewState extends State<CheckInboxView> {
       if (!mounted) return;
       setState(() => _sent = already
           ? 'That address is already confirmed. You can log in now.'
-          : 'We sent the email again. Please check your inbox.');
+          : 'We are sending the email again. It should arrive within a '
+              'minute.');
     } on AuthException catch (e) {
       if (mounted) setState(() => _error = e.message);
     } catch (_) {
@@ -95,7 +96,9 @@ class _CheckInboxViewState extends State<CheckInboxView> {
             TextSpan(
               style: OnboardingScaffold.cardBody,
               children: [
-                const TextSpan(text: 'We sent an email to '),
+                // The backend queues the email, so it is on its way rather
+                // than already in the inbox.
+                const TextSpan(text: 'We are sending an email to '),
                 TextSpan(
                   text: email,
                   style: const TextStyle(
@@ -104,8 +107,9 @@ class _CheckInboxViewState extends State<CheckInboxView> {
                   ),
                 ),
                 const TextSpan(
-                  text: '. Open it and tap the green "Confirm my email" '
-                      'button, then come back here and log in.',
+                  text: '. It should arrive within a minute. Open it and tap '
+                      'the green "Confirm my email" button, then come back '
+                      'here and log in.',
                 ),
               ],
             ),

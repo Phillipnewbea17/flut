@@ -54,7 +54,9 @@ class _ChangePasswordViewState extends State<ChangePasswordView> {
   Future<void> _save() async {
     if (_saving) return;
 
-    final nextError = PasswordValidator.validate(_next.text);
+    final session = context.read<SessionProvider>();
+    final nextError =
+        PasswordValidator.validate(_next.text, email: session.lastEmail);
     final confirmError = PasswordValidator.matches(_next.text, _confirm.text)
         ? null
         : 'The passwords do not match. Please type them again.';
@@ -78,18 +80,25 @@ class _ChangePasswordViewState extends State<ChangePasswordView> {
       _confirmError = null;
     });
 
-    final problem = await context.read<SessionProvider>().changePassword(
-          currentPassword: _current.text,
-          newPassword: _next.text,
-        );
+    final problem = await session.changePassword(
+      currentPassword: _current.text,
+      newPassword: _next.text,
+    );
 
     if (!mounted) return;
     setState(() => _saving = false);
 
     if (problem != null) {
-      // The backend only knows whether the current one was right, so its
-      // message goes under that box.
-      setState(() => _currentError = problem);
+      // A new password the backend refused goes under the new password;
+      // anything else (a wrong current password, no connection) under the
+      // current one.
+      setState(() {
+        if (SessionProvider.newPasswordProblems.contains(problem)) {
+          _nextError = problem;
+        } else {
+          _currentError = problem;
+        }
+      });
       return;
     }
 

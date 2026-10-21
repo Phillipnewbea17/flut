@@ -33,6 +33,7 @@ class RequestsRepository extends ChangeNotifier {
   bool _cacheLoaded = false;
   bool _loading = false;
   String? _error;
+  bool _notLinked = false;
 
   /// Newest first.
   List<ServiceRequest> get all => List.unmodifiable(_items);
@@ -40,6 +41,17 @@ class RequestsRepository extends ChangeNotifier {
 
   /// Set when the last refresh failed (the saved copy is still shown).
   String? get error => _error;
+
+  /// The office answered that this account is not linked to a senior
+  /// citizen record yet (code "not_linked"): requests open once the OSCA
+  /// office approves the senior's application.
+  bool get notLinked => _notLinked;
+
+  /// What the request screens say while [notLinked].
+  static const String notLinkedMessage =
+      'You can send requests once the OSCA office approves your Senior '
+      'Citizen ID application. If you have not applied yet, start your '
+      'application first.';
 
   bool isAvailable(RequestKind kind) => _service.isAvailable(kind);
 
@@ -89,8 +101,19 @@ class RequestsRepository extends ChangeNotifier {
         _mergeServer(kind, await _service.fetch(kind));
       }
       _error = null;
+      _notLinked = false;
+    } on ApiException catch (e) {
+      // Not an error: the account has no senior record yet.
+      _notLinked = e.code == 'not_linked';
+      _error = _notLinked
+          ? null
+          : e.statusCode == null
+              ? 'No internet. Showing the requests saved on this phone.'
+              : 'Could not load your requests right now. Showing the ones '
+                  'saved on this phone.';
     } catch (_) {
-      _error = 'No internet. Showing the requests saved on this phone.';
+      _error = 'Could not load your requests right now. Showing the ones '
+          'saved on this phone.';
     }
 
     _sort();
@@ -139,6 +162,7 @@ class RequestsRepository extends ChangeNotifier {
     } on NotConnectedException catch (e) {
       result = request.copyWith(sendError: () => e.toString());
     } on ApiException catch (e) {
+      if (e.code == 'not_linked') _notLinked = true;
       result = request.copyWith(sendError: () => e.message);
     } catch (_) {
       result = request.copyWith(
@@ -166,6 +190,7 @@ class RequestsRepository extends ChangeNotifier {
     _items = [];
     _cacheLoaded = false;
     _error = null;
+    _notLinked = false;
     notifyListeners();
   }
 

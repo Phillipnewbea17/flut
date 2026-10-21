@@ -198,6 +198,20 @@ class SessionProvider extends ChangeNotifier {
   // Signed in
   // ---------------------------------------------------------------------------
 
+  /// Change Password's answer when the current password is wrong. The
+  /// screen shows this one under the current password, everything else
+  /// under the new one.
+  static const String wrongCurrentPassword =
+      'Your current password is not correct.';
+
+  /// Change Password's answers about the new password, which the screen
+  /// shows under the new password instead.
+  static final Set<String> newPasswordProblems = {
+    const AuthException(AuthError.samePassword).message,
+    const AuthException(AuthError.weakPassword).message,
+    const AuthException(AuthError.invalidPassword).message,
+  };
+
   /// Account > Change Password. Returns an error message, or null when
   /// changed.
   Future<String?> changePassword({
@@ -214,6 +228,10 @@ class SessionProvider extends ChangeNotifier {
       return null;
     } on AuthException catch (e) {
       if (e.error == AuthError.sessionExpired) await expireSession();
+      // The backend calls a wrong current password "invalid credentials",
+      // whose usual wording mentions an email address this screen has no
+      // box for.
+      if (e.error == AuthError.invalidCredentials) return wrongCurrentPassword;
       return e.message;
     }
   }

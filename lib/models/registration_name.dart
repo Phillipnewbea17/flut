@@ -21,6 +21,11 @@ class RegistrationName {
   static const int maxNameLength = 100;
   static const int maxSuffixLength = 10;
 
+  /// The whole name is saved as one full name, which holds 255 letters
+  /// (app_accounts.full_name on the backend), even though each part may be
+  /// up to [maxNameLength].
+  static const int maxFullNameLength = 255;
+
   /// Same letters as Personal Information (PersonalInfoValidator).
   static final RegExp _nameChars = RegExp(r"^[A-Za-zÑñ .'\-]+$");
 
@@ -74,6 +79,12 @@ class RegistrationName {
         (name.suffix.length > maxSuffixLength ||
             !_suffixChars.hasMatch(name.suffix))) {
       errors['suffix'] = 'Please write the suffix like Jr., Sr. or III.';
+    }
+
+    // Every part fits, but together they are too long to save.
+    if (errors.isEmpty && name.fullName.length > maxFullNameLength) {
+      errors['lastName'] =
+          'Your full name is too long. Please use a shorter form of it.';
     }
     return errors;
   }
