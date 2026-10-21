@@ -1,7 +1,7 @@
 import 'package:flutter/material.dart';
 import 'package:intl/intl.dart';
 
-import '../models/benefit.dart';
+import '../models/announcement.dart';
 import '../theme/app_colors.dart';
 
 /// One announcement from the OSCA office (Home and Announcements):
@@ -27,6 +27,9 @@ class AnnouncementCard extends StatelessWidget {
   @override
   Widget build(BuildContext context) {
     final date = announcement.date;
+    // "October 20, 2026 · 9:15 PM": when it was posted, in Philippine time.
+    final posted =
+        DateFormat('MMMM d, y · h:mm a').format(announcement.postedAt);
     return SizedBox(
       width: width,
       child: DecoratedBox(
@@ -108,6 +111,17 @@ class AnnouncementCard extends StatelessWidget {
                   child: Column(
                     crossAxisAlignment: CrossAxisAlignment.start,
                     children: [
+                      if (showFullText) ...[
+                        Text(
+                          posted,
+                          style: const TextStyle(
+                            fontSize: 15,
+                            fontWeight: FontWeight.w700,
+                            color: AppColors.primary,
+                          ),
+                        ),
+                        const SizedBox(height: 8),
+                      ],
                       Text(
                         announcement.body,
                         maxLines: showFullText ? null : 3,

@@ -1,8 +1,8 @@
 import 'package:flutter/material.dart';
 import 'package:provider/provider.dart';
 
-import '../../../models/benefit.dart';
-import '../../../services/benefits_service.dart';
+import '../../../models/announcement.dart';
+import '../../../services/announcements_service.dart';
 import '../../../theme/app_colors.dart';
 import '../../../theme/app_theme.dart';
 import '../../../widgets/announcement_card.dart';
@@ -22,11 +22,11 @@ class _AnnouncementsViewState extends State<AnnouncementsView> {
   @override
   void initState() {
     super.initState();
-    _future = context.read<BenefitsService>().fetchAnnouncements();
+    _future = context.read<AnnouncementsService>().fetchAnnouncements();
   }
 
   Future<void> _reload() async {
-    final future = context.read<BenefitsService>().fetchAnnouncements();
+    final future = context.read<AnnouncementsService>().fetchAnnouncements();
     setState(() => _future = future);
     try {
       await future;

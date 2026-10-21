@@ -6,12 +6,12 @@ import 'package:provider/provider.dart';
 
 import '../../../app_state/accessibility_provider.dart';
 import '../../../app_state/user_provider.dart';
+import '../../../models/announcement.dart';
 import '../../../models/application_status.dart';
-import '../../../models/benefit.dart';
 import '../../../models/user_profile.dart';
 import '../../../repositories/application_repository.dart';
 import '../../../routes/app_router.dart';
-import '../../../services/benefits_service.dart';
+import '../../../services/announcements_service.dart';
 import '../../../theme/app_colors.dart';
 import '../../../widgets/announcement_card.dart';
 import '../../../widgets/info_card.dart';
@@ -36,13 +36,13 @@ class _HomeDashboardViewState extends State<HomeDashboardView> {
   @override
   void initState() {
     super.initState();
-    _announcements = context.read<BenefitsService>().fetchAnnouncements();
+    _announcements = context.read<AnnouncementsService>().fetchAnnouncements();
   }
 
   Future<void> _refresh() async {
     final applications = context.read<ApplicationRepository>();
     setState(() {
-      _announcements = context.read<BenefitsService>().fetchAnnouncements();
+      _announcements = context.read<AnnouncementsService>().fetchAnnouncements();
     });
     await Future.wait<void>([
       applications.load(),
