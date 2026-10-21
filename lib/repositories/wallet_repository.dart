@@ -1,4 +1,4 @@
-import 'package:flutter/widgets.dart';
+import 'package:flutter/foundation.dart';
 
 import '../models/purchase_booklet.dart';
 import '../models/senior_id.dart';
@@ -18,6 +18,7 @@ class WalletRepository extends ChangeNotifier {
   static const _kBooklet = 'purchase_booklet';
 
   SeniorId? _seniorId;
+  Uint8List? _photo;
   List<PurchaseEntry> _entries = [];
   bool _cacheLoaded = false;
   bool _loading = false;
@@ -27,11 +28,9 @@ class WalletRepository extends ChangeNotifier {
   bool get loading => _loading;
   PurchaseBooklet get booklet => PurchaseBooklet(List.unmodifiable(_entries));
 
-  /// The ID photo held by the office (signed in), or null when there is none.
-  ImageProvider? get idPhoto {
-    final url = _seniorId?.photoUrl ?? '';
-    return url.isEmpty ? null : _service.idPhoto(url);
-  }
+  /// The 2x2 photo the office holds (downloaded when the ID loads), or null
+  /// when there is none or it could not be downloaded.
+  Uint8List? get idPhoto => _photo;
 
   Future<void> load() async {
     if (_loading) return;
@@ -41,11 +40,26 @@ class WalletRepository extends ChangeNotifier {
     try {
       _seniorId = await _service.fetchSeniorId();
       await _db.write(_kSeniorId, _seniorId?.toJson());
+      await _loadPhoto();
     } catch (_) {
       // Offline: keep the saved ID.
     } finally {
       _loading = false;
       notifyListeners();
+    }
+  }
+
+  /// Downloads the photo of the ID on screen. A photo that cannot be fetched
+  /// is dropped, so the card never shows another senior's photo.
+  Future<void> _loadPhoto() async {
+    if ((_seniorId?.photoUrl ?? '').isEmpty) {
+      _photo = null;
+      return;
+    }
+    try {
+      _photo = await _service.fetchPhoto();
+    } catch (_) {
+      _photo = null;
     }
   }
 
@@ -63,6 +77,7 @@ class WalletRepository extends ChangeNotifier {
 
   void reset() {
     _seniorId = null;
+    _photo = null;
     _entries = [];
     _cacheLoaded = false;
     notifyListeners();

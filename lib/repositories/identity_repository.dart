@@ -236,12 +236,12 @@ class IdentityRepository extends ChangeNotifier {
   // ---------------------------------------------------------------------------
 
   /// Shows the saved profile, then asks the backend for the latest. Returns
-  /// true only when the backend says this account must verify (again).
-  Future<bool> load() async {
+  /// the profile the backend just sent, or null when it could not be asked
+  /// (the saved copy stays on screen).
+  Future<LinkedProfile?> load() async {
     if (!_loaded) await _readCache();
     notifyListeners();
-    final fresh = await refreshFromServer();
-    return fresh != null && fresh.state == IdentityState.unverified;
+    return refreshFromServer();
   }
 
   /// The record from the backend, or null when it cannot be asked.

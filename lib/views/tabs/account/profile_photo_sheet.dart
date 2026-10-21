@@ -13,8 +13,10 @@ import '../../../utils/image_compressor.dart';
 enum _PhotoAction { camera, gallery, remove }
 
 /// "Change photo": Take photo, Choose from gallery, Remove photo. The photo
-/// is cropped to a circle and saved on this phone only (never uploaded),
-/// for the app profile only (it does not change the Senior ID).
+/// is cropped to a circle, saved on this phone, and sent to the OSCA office
+/// so staff see it in User Management. It is for the app profile only (it
+/// does not change the Senior ID). A change that cannot be sent now is sent
+/// the next time the app opens with internet (UserRepository).
 Future<void> changeProfilePhoto(BuildContext context) async {
   final user = context.read<UserProvider>();
   final hasPhoto = user.profile?.photoPath != null;
@@ -73,8 +75,21 @@ Future<void> changeProfilePhoto(BuildContext context) async {
   if (action == _PhotoAction.remove) {
     await user.setPhotoPath(null);
     await store.delete(old);
-    await users.removePhoto(); // best effort; the phone copy is already gone
-    if (context.mounted) _say(context, 'Photo removed.');
+    final removed = await users.removePhoto();
+    if (removed) {
+      await store.clearPending();
+    } else {
+      await store.markPending(PendingPhoto.remove);
+    }
+    if (context.mounted) {
+      _say(
+        context,
+        removed
+            ? 'Photo removed.'
+            : 'Photo removed from this phone. The OSCA office will stop '
+                'seeing it the next time you open the app with internet.',
+      );
+    }
     return;
   }
 
@@ -111,14 +126,21 @@ Future<void> changeProfilePhoto(BuildContext context) async {
   await store.delete(old);
 
   // Send it to OSCA so it shows in User Management. The photo is already
-  // saved on this phone, so a failed upload is not fatal.
+  // saved on this phone; when the upload fails it is sent again the next
+  // time the app opens (UserRepository.sendPendingPhoto).
   final synced = await users.uploadPhoto(bytes);
+  if (synced) {
+    await store.clearPending();
+  } else {
+    await store.markPending(PendingPhoto.upload);
+  }
   if (context.mounted) {
     _say(
       context,
       synced
           ? 'Photo updated.'
-          : 'Photo saved on your phone. It will sync when you are online.',
+          : 'Photo saved on this phone. It will be sent to the OSCA office '
+              'the next time you open the app with internet.',
     );
   }
 }

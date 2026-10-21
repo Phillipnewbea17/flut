@@ -45,9 +45,8 @@ class ApiException implements Exception {
 /// backend. Without a backend address nothing is sent and nothing is
 /// pretended: every call fails with "not connected".
 ///
-/// The only answers from the phone are the [_bundled] guides (benefits
-/// and discounts, places): reference content shipped with the app, which
-/// the backend has no tables for.
+/// The only answer from the phone is the [_bundled] places guide: reference
+/// content shipped with the app, which the backend has no tables for.
 ///
 /// The address is baked in ([permanentBaseUrl]), so an installed app works
 /// on any phone, on mobile data, with no extra flags. Override it for local
@@ -109,17 +108,6 @@ class ApiClient {
     '/places': 'places.json',
   };
 
-  /// Addresses the backend answers, but which also ship a copy in the app
-  /// for when it cannot be reached: address -> file in assets/data/.
-  ///
-  /// OSCA keeps the benefit cards in the web app now, so the backend has the
-  /// current wording. Most of them are national law that rarely changes, and
-  /// a senior at a pharmacy counter needs to show what they are entitled to
-  /// even with no signal - so a slightly old copy beats an error.
-  static const Map<String, String> _fallback = {
-    '/benefits': 'benefits.json',
-  };
-
   static const ApiException notConnected = ApiException(
     'This app is not connected to the OSCA office. Please contact OSCA.',
   );
@@ -130,16 +118,19 @@ class ApiClient {
   Future<dynamic> get(String path) async {
     final file = _bundled[path];
     if (file != null) return _readBundled(file);
+    if (!isConnected) throw notConnected;
+    return _send(http.Request('GET', _uri(path)));
+  }
 
-    final backup = _fallback[path];
-    if (!isConnected) {
-      if (backup != null) return _readBundled(backup);
-      throw notConnected;
-    }
+  /// Downloads the file at [path] (a photo) as bytes, with the sign-in token.
+  /// Null when the server has no file there (404).
+  Future<Uint8List?> getBytes(String path) async {
+    if (!isLive(path)) throw notConnected;
     try {
-      return await _send(http.Request('GET', _uri(path)));
-    } on ApiException {
-      if (backup != null) return _readBundled(backup);
+      return await _send(http.Request('GET', _uri(path)), asBytes: true)
+          as Uint8List;
+    } on ApiException catch (e) {
+      if (e.statusCode == 404) return null;
       rethrow;
     }
   }
@@ -203,14 +194,16 @@ class ApiClient {
 
   Uri _uri(String path) => Uri.parse('$baseUrl/api/mobile$path');
 
-  Future<dynamic> _send(http.BaseRequest request) async {
+  /// Sends [request]. Returns the decoded JSON, or the raw bytes when
+  /// [asBytes] (a photo). Any other answer that is not 2xx throws.
+  Future<dynamic> _send(http.BaseRequest request, {bool asBytes = false}) async {
     const noConnection = ApiException(
       'Could not connect. Please check your internet and try again.',
     );
     request.headers['Accept'] = 'application/json';
     // A free ngrok address answers an unknown visitor with a warning page
     // instead of the backend. This header asks for the backend itself.
-    if (request.url.host.endsWith('.ngrok-free.app')) {
+    if (_isNgrok(request.url.host)) {
       request.headers['ngrok-skip-browser-warning'] = 'true';
     }
     final token = this.token;
@@ -229,6 +222,9 @@ class ApiClient {
       throw noConnection;
     }
 
+    final status = response.statusCode;
+    if (status >= 200 && status < 300 && asBytes) return response.bodyBytes;
+
     dynamic data;
     try {
       final text = utf8.decode(response.bodyBytes);
@@ -237,7 +233,6 @@ class ApiClient {
       data = null;
     }
 
-    final status = response.statusCode;
     if (status >= 200 && status < 300) return data;
 
     if (status == 401 && token != null && !_isAuthPath(request.url)) {
@@ -270,6 +265,16 @@ class ApiClient {
   }
 
   static bool _isAuthPath(Uri url) => url.path.startsWith('/api/mobile/auth/');
+
+  /// ngrok's addresses: the free ones (.ngrok-free.app, .ngrok-free.dev,
+  /// like [permanentBaseUrl]) and the paid ones.
+  static bool _isNgrok(String host) => const [
+        '.ngrok-free.app',
+        '.ngrok-free.dev',
+        '.ngrok.app',
+        '.ngrok.dev',
+        '.ngrok.io',
+      ].any(host.endsWith);
 
   static Map<String, dynamic> _asMap(dynamic data) =>
       data is Map ? Map<String, dynamic>.from(data) : <String, dynamic>{};

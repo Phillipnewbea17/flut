@@ -32,10 +32,17 @@ extension SeniorIdStatusInfo on SeniorIdStatus {
 class SeniorId {
   final String idNumber;
   final String fullName;
-  final DateTime birthDate;
+
+  /// Date only. Null when the office did not record it.
+  final DateTime? birthDate;
+
+  /// The purok (street) the senior lives in, as on the card, e.g. "Purok 3".
+  final String purok;
   final String address;
   final String issuedBy; // e.g. "OSCA Ubay, Bohol"
-  final DateTime issuedAt;
+
+  /// Date only. Null until the card is released (Pending Issuance).
+  final DateTime? issuedAt;
   final SeniorIdStatus status;
 
   /// The office's record number for this senior, e.g. "SC-2026-0010".
@@ -45,16 +52,18 @@ class SeniorId {
   final int? age;
   final String sex;
 
-  /// Web address of the ID photo, if the office has one.
+  /// Web address of the ID photo, if the office has one. The photo itself is
+  /// downloaded with the sign-in token (WalletRepository).
   final String photoUrl;
 
   const SeniorId({
     required this.idNumber,
     required this.fullName,
-    required this.birthDate,
-    required this.address,
-    required this.issuedBy,
-    required this.issuedAt,
+    this.birthDate,
+    this.purok = '',
+    this.address = '',
+    this.issuedBy = '',
+    this.issuedAt,
     this.status = SeniorIdStatus.active,
     this.recordNo = '',
     this.age,
@@ -70,10 +79,11 @@ class SeniorId {
   Map<String, dynamic> toJson() => {
         'idNumber': idNumber,
         'fullName': fullName,
-        'birthDate': birthDate.toIso8601String(),
+        'birthDate': birthDate?.toIso8601String(),
+        'purok': purok,
         'address': address,
         'issuedBy': issuedBy,
-        'issuedAt': issuedAt.toIso8601String(),
+        'issuedAt': issuedAt?.toIso8601String(),
         'status': status.name,
         'recordNo': recordNo,
         'age': age,
@@ -85,12 +95,11 @@ class SeniorId {
     return SeniorId(
       idNumber: json['idNumber'] as String? ?? '',
       fullName: json['fullName'] as String? ?? '',
-      birthDate:
-          DateTime.tryParse(json['birthDate'] as String? ?? '') ?? DateTime(1960),
+      birthDate: DateTime.tryParse(json['birthDate'] as String? ?? ''),
+      purok: json['purok'] as String? ?? '',
       address: json['address'] as String? ?? '',
       issuedBy: json['issuedBy'] as String? ?? '',
-      issuedAt:
-          DateTime.tryParse(json['issuedAt'] as String? ?? '') ?? DateTime.now(),
+      issuedAt: DateTime.tryParse(json['issuedAt'] as String? ?? ''),
       status: SeniorIdStatusInfo.parse(json['status'] as String?),
       recordNo: json['recordNo'] as String? ?? '',
       age: (json['age'] as num?)?.toInt(),

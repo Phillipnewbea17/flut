@@ -17,9 +17,9 @@ import 'repositories/requests_repository.dart';
 import 'repositories/user_repository.dart';
 import 'repositories/wallet_repository.dart';
 import 'routes/app_router.dart';
+import 'services/announcements_service.dart';
 import 'services/api_client.dart';
 import 'services/auth_service.dart';
-import 'services/benefits_service.dart';
 import 'services/camera_access.dart';
 import 'services/document_service.dart';
 import 'services/id_text_reader.dart';
@@ -91,6 +91,9 @@ Future<void> main() async {
   final user = UserProvider(prefs);
   final accessibility = await AccessibilityProvider.load(prefs);
 
+  // The app-profile photo, kept on this phone only.
+  final photoStore = ProfilePhotoStore();
+
   // Sign-in flows. Sign up, Login and Forgot password keep separate
   // business logic; only the session is shared.
   final registration = RegistrationFlow(auth: auth, session: session);
@@ -104,7 +107,11 @@ Future<void> main() async {
     await user.confirmEmail(email);
     if (name != null) await user.applyRegistrationName(name);
     final profile = await identity.refreshFromServer();
-    if (profile != null) await user.applyLinkedProfile(profile);
+    if (profile != null) {
+      await user.applyLinkedProfile(profile);
+      // The photo was removed at logout: the server's copy comes back.
+      await users.syncPhoto(photoStore, user, profile);
+    }
     // Keep the name Login greets with ("Welcome back, Rosela").
     final fullName = user.profile?.fullName ?? '';
     if (fullName.isNotEmpty) {
@@ -126,9 +133,6 @@ Future<void> main() async {
 
   // The backend refused the session token: back to Login.
   api.onSessionExpired = () => session.expireSession();
-
-  // The app-profile photo, kept on this phone only.
-  final photoStore = ProfilePhotoStore();
 
   // Log out (or an ended session) wipes everything that belongs to the
   // account from this phone. Nothing is deleted on the server.
@@ -172,7 +176,7 @@ Future<void> main() async {
         Provider<RegistrationFlow>.value(value: registration),
         Provider<LoginFlow>.value(value: login),
         Provider<PasswordResetFlow>.value(value: passwordReset),
-        Provider<BenefitsService>.value(value: BenefitsService(api)),
+        Provider<AnnouncementsService>.value(value: AnnouncementsService(api)),
         Provider<PensionService>.value(value: PensionService(api)),
         Provider<SosService>.value(value: SosService()),
         Provider<ImageCompressor>.value(value: ImageCompressor()),
@@ -223,11 +227,25 @@ class _SeniorCompanionAppState extends State<SeniorCompanionApp>
       _pausedAt = null;
       if (pausedAt == null) return;
       final session = context.read<SessionProvider>();
-      if (session.onboardingComplete &&
-          DateTime.now().difference(pausedAt) > _recheckAfter) {
+      if (!session.onboardingComplete) return;
+      _syncWithServer();
+      if (DateTime.now().difference(pausedAt) > _recheckAfter) {
         session.recheckSession();
       }
     }
+  }
+
+  /// A profile photo change that had no connection before is sent first.
+  /// Then the linked record is asked for again, and the app-profile photo on
+  /// this phone is matched to the server's.
+  Future<void> _syncWithServer() async {
+    final users = context.read<UserRepository>();
+    final identity = context.read<IdentityRepository>();
+    final user = context.read<UserProvider>();
+    final store = context.read<ProfilePhotoStore>();
+    await users.sendPendingPhoto(store, user.profile?.photoPath);
+    final fresh = await identity.refreshFromServer();
+    if (fresh != null) await users.syncPhoto(store, user, fresh);
   }
 
   @override

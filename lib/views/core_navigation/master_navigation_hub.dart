@@ -3,12 +3,14 @@ import 'package:go_router/go_router.dart';
 import 'package:provider/provider.dart';
 
 import '../../app_state/accessibility_provider.dart';
+import '../../app_state/user_provider.dart';
 import '../../repositories/application_repository.dart';
 import '../../repositories/document_repository.dart';
 import '../../repositories/identity_repository.dart';
 import '../../repositories/requests_repository.dart';
 import '../../repositories/user_repository.dart';
 import '../../repositories/wallet_repository.dart';
+import '../../services/profile_photo_store.dart';
 import '../../theme/app_colors.dart';
 import '../../widgets/section_title.dart';
 import '../../widgets/sos_button.dart';
@@ -40,10 +42,18 @@ class _MasterNavigationHubState extends State<MasterNavigationHub> {
     });
   }
 
-  /// Loads the linked senior record (Personal Information). Linking it is
-  /// not part of signing in, so Home never redirects for it.
+  /// Loads the linked senior citizen record (Personal Information). Linking it is
+  /// not part of signing in, so Home never redirects for it. Then the
+  /// app-profile photo on this phone is matched to the server's.
   Future<void> _checkIdentity() async {
-    await context.read<IdentityRepository>().load();
+    final users = context.read<UserRepository>();
+    final store = context.read<ProfilePhotoStore>();
+    final user = context.read<UserProvider>();
+    // A profile photo change that had no connection before goes first.
+    await users.sendPendingPhoto(store, user.profile?.photoPath);
+    if (!mounted) return;
+    final fresh = await context.read<IdentityRepository>().load();
+    if (fresh != null && mounted) await users.syncPhoto(store, user, fresh);
   }
 
   void _select(int index) {

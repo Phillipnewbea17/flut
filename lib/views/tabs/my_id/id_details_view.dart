@@ -54,12 +54,14 @@ class _IdDetailsViewState extends State<IdDetailsView> {
                       _Row('OSCA / Senior ID number', value: id.idNumber, selectable: true),
                       if (id.recordNo.isNotEmpty)
                         _Row('Record number', value: id.recordNo, selectable: true),
-                      _Row('Birthday', value: date.format(id.birthDate)),
+                      if (id.birthDate != null)
+                        _Row('Birthday', value: date.format(id.birthDate!)),
                       if (id.age != null) _Row('Age', value: '${id.age} years old'),
                       if (id.sex.isNotEmpty) _Row('Sex', value: id.sex),
                       if (id.address.isNotEmpty) _Row('Address', value: id.address),
                       _Row('Issued by', value: id.issuedBy),
-                      _Row('Date issued', value: date.format(id.issuedAt)),
+                      if (id.issuedAt != null)
+                        _Row('Date issued', value: date.format(id.issuedAt!)),
                     ],
                   ),
                 ),

@@ -1,3 +1,4 @@
+import '../utils/manila_time.dart';
 import 'personal_info.dart';
 
 /// Answer to "is there an SCMS senior citizen record with this ID?".
@@ -152,11 +153,20 @@ class LinkedProfile {
   /// a path on the phone.
   final String photoUrl;
 
+  /// The app-profile photo (Account) is on the server.
+  final bool hasPhoto;
+
+  /// Changes with every upload of the app-profile photo; "" without one.
+  /// The phone compares it with the version it saved (UserRepository.syncPhoto).
+  final String photoVersion;
+
   const LinkedProfile({
     required this.info,
     required this.state,
     this.registrationStatus = '',
     this.photoUrl = '',
+    this.hasPhoto = false,
+    this.photoVersion = '',
   });
 
   bool get isVerified => state == IdentityState.verified;
@@ -167,6 +177,8 @@ class LinkedProfile {
         state: state ?? this.state,
         registrationStatus: registrationStatus,
         photoUrl: photoUrl,
+        hasPhoto: hasPhoto,
+        photoVersion: photoVersion,
       );
 
   Map<String, dynamic> toJson() => {
@@ -178,6 +190,8 @@ class LinkedProfile {
         },
         'registrationStatus': registrationStatus,
         'photoUrl': photoUrl,
+        'hasPhoto': hasPhoto,
+        'photoVersion': photoVersion,
       };
 
   factory LinkedProfile.fromJson(Map<String, dynamic> json) => LinkedProfile(
@@ -185,6 +199,8 @@ class LinkedProfile {
         state: IdentityStateInfo.parse(json['identityStatus'] as String?),
         registrationStatus: json['registrationStatus'] as String? ?? '',
         photoUrl: json['photoUrl'] as String? ?? '',
+        hasPhoto: json['hasPhoto'] as bool? ?? false,
+        photoVersion: json['photoVersion'] as String? ?? '',
       );
 }
 
@@ -241,7 +257,7 @@ class CorrectionRequest {
           orElse: () => CorrectionStatus.pending,
         ),
         officeNote: json['officeNote'] as String? ?? '',
-        submittedAt: DateTime.tryParse(json['submittedAt'] as String? ?? '') ??
+        submittedAt: parseServerTime(json['submittedAt'] as String?) ??
             DateTime.now(),
         localOnly: json['localOnly'] as bool? ?? false,
       );
