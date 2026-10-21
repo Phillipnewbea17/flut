@@ -8,6 +8,7 @@ import 'package:provider/provider.dart';
 
 import '../../../models/document_item.dart';
 import '../../../repositories/document_repository.dart';
+import '../../../services/api_client.dart';
 import '../../../theme/app_colors.dart';
 import '../../../theme/app_theme.dart';
 import '../../../utils/image_compressor.dart';
@@ -49,7 +50,16 @@ class _IdPhotoCaptureViewState extends State<IdPhotoCaptureView> {
     if (bytes == null) return;
     final documents = context.read<DocumentRepository>();
     setState(() => _saving = true);
-    final item = await documents.add(DocumentType.idPhoto, bytes);
+    final DocumentItem item;
+    try {
+      item = await documents.add(DocumentType.idPhoto, bytes);
+    } on ApiException catch (e) {
+      // The office refused it (e.g. a new photo is not asked for now).
+      if (!mounted) return;
+      setState(() => _saving = false);
+      _say(e.message);
+      return;
+    }
     if (!mounted) return;
     setState(() => _saving = false);
     _say(item.isUploaded

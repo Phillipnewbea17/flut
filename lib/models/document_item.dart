@@ -1,3 +1,5 @@
+import '../utils/manila_time.dart';
+
 /// The papers needed for a Senior Citizen ID.
 ///
 /// These are exactly the four documents the OSCA office checks in the web
@@ -150,7 +152,7 @@ class DocumentReview {
         orElse: () => DocumentReviewStatus.pending,
       ),
       note: json['note'] as String? ?? '',
-      reviewedAt: DateTime.tryParse(json['reviewedAt'] as String? ?? ''),
+      reviewedAt: parseServerTime(json['reviewedAt'] as String?),
     );
   }
 }
@@ -199,16 +201,28 @@ extension DocumentStateInfo on DocumentState {
       this == DocumentState.rejected;
 }
 
-/// Combines the newest photo of a paper ([item]) with the office's
-/// [review]. A photo taken after the review replaces the reviewed one, so it
-/// shows as "Submitted" (waiting for a new check) instead.
+/// What the office's [review] says about a paper it has on the server.
+DocumentState _stateOfReview(DocumentReview review) => switch (review.status) {
+      DocumentReviewStatus.approved => DocumentState.approved,
+      DocumentReviewStatus.needsCorrection => DocumentState.needsCorrection,
+      DocumentReviewStatus.rejected => DocumentState.rejected,
+      DocumentReviewStatus.pending => DocumentState.submitted,
+    };
+
+/// Combines the newest photo of a paper ([item], saved on this phone) with
+/// the office's [review] (the paper as the server has it). A photo taken
+/// after the review replaces the reviewed one, so it shows as "Submitted"
+/// (waiting for a new check) instead. Without a photo on this phone, the
+/// server's review is the answer, so a new phone or a logout shows the same.
 DocumentState documentStateOf({
   required DocumentItem? item,
   required DocumentReview? review,
   required bool applicationApproved,
   required bool sendsToOffice,
 }) {
-  if (item == null) return DocumentState.notSubmitted;
+  if (item == null) {
+    return review == null ? DocumentState.notSubmitted : _stateOfReview(review);
+  }
   switch (item.status) {
     case DocumentStatus.uploading:
       return DocumentState.sending;
@@ -221,18 +235,9 @@ DocumentState documentStateOf({
   if (!sendsToOffice) return DocumentState.savedOnPhone;
 
   final reviewedAt = review?.reviewedAt;
-  final newerPhoto = reviewedAt != null && item.addedAt.isAfter(reviewedAt);
-  if (review != null && !newerPhoto) {
-    switch (review.status) {
-      case DocumentReviewStatus.approved:
-        return DocumentState.approved;
-      case DocumentReviewStatus.needsCorrection:
-        return DocumentState.needsCorrection;
-      case DocumentReviewStatus.rejected:
-        return DocumentState.rejected;
-      case DocumentReviewStatus.pending:
-        return DocumentState.submitted;
-    }
-  }
+  // The phone's clock is compared with the office's time in Philippine time.
+  final newerPhoto =
+      reviewedAt != null && toPhilippineTime(item.addedAt).isAfter(reviewedAt);
+  if (review != null && !newerPhoto) return _stateOfReview(review);
   return applicationApproved ? DocumentState.approved : DocumentState.submitted;
 }

@@ -2,10 +2,13 @@ import 'dart:typed_data';
 
 import 'package:flutter/foundation.dart';
 
+import '../models/application_status.dart';
 import '../models/document_item.dart';
+import '../services/api_client.dart';
 import '../services/document_service.dart';
 import '../storage/document_vault.dart';
 import '../storage/local_db.dart';
+import '../utils/manila_time.dart';
 
 /// Photos of the user's papers: saved on the phone first, then sent.
 /// If sending fails (no signal), the photo stays saved and can be sent again.
@@ -45,12 +48,28 @@ class DocumentRepository extends ChangeNotifier {
   /// Every paper is required: the four the OSCA office checks.
   static List<DocumentType> get requiredTypes => DocumentType.values;
 
-  /// True when every required paper was sent.
-  bool get hasAllRequired =>
-      requiredTypes.every((t) => latestOf(t)?.isUploaded ?? false);
+  /// The papers the application needs now: the ones the office asked to be
+  /// sent again, or all four for a first submission.
+  static List<DocumentType> requiredFor(ApplicationStatus status) =>
+      status.reuploadTypes.isEmpty ? requiredTypes : status.reuploadTypes;
 
-  int get requiredDoneCount =>
-      requiredTypes.where((t) => latestOf(t)?.isUploaded ?? false).length;
+  /// How many of the four papers are done: the ones the office has on the
+  /// server, plus the ones sent from this phone that it does not have yet.
+  int sentCount(ApplicationStatus status) => requiredTypes.where((t) {
+        final sentHere = latestOf(t)?.isUploaded ?? false;
+        return status.reviewOf(t) != null || sentHere;
+      }).length;
+
+  /// True when every paper the application needs is sent from this phone,
+  /// and each newest copy is later than the office's review of that paper.
+  bool readyToSubmit(ApplicationStatus status) =>
+      requiredFor(status).every((t) {
+        final item = latestOf(t);
+        if (item == null || !item.isUploaded) return false;
+        final reviewedAt = status.reviewOf(t)?.reviewedAt;
+        return reviewedAt == null ||
+            toPhilippineTime(item.addedAt).isAfter(reviewedAt);
+      });
 
   Future<void> load() async {
     if (_loaded) return;
@@ -99,18 +118,25 @@ class DocumentRepository extends ChangeNotifier {
     return upload(item);
   }
 
-  /// Sends (or re-sends) a saved photo.
+  /// Sends (or re-sends) a saved photo. The office refusing it (422: not
+  /// allowed now, or a paper it did not ask for) throws the office's own
+  /// message as an ApiException; the photo stays saved on the phone.
   Future<DocumentItem> upload(DocumentItem item) async {
     _replace(item.copyWith(status: DocumentStatus.uploading));
     DocumentItem result;
+    ApiException? refusal;
     try {
       await _service.upload(item);
       result = item.copyWith(status: DocumentStatus.uploaded);
+    } on ApiException catch (e) {
+      result = item.copyWith(status: DocumentStatus.failed);
+      if (e.statusCode == 422) refusal = e;
     } catch (_) {
       result = item.copyWith(status: DocumentStatus.failed);
     }
     _replace(result);
     await _save();
+    if (refusal != null) throw refusal;
     return result;
   }
 
@@ -121,9 +147,10 @@ class DocumentRepository extends ChangeNotifier {
     await _vault.delete(item.filePath);
   }
 
-  /// Sends the finished application. Returns the reference number.
-  Future<String> submitApplication() {
-    final papers = requiredTypes
+  /// Sends the finished application (the papers it needs, see requiredFor).
+  /// Returns the reference number.
+  Future<String> submitApplication(ApplicationStatus status) {
+    final papers = requiredFor(status)
         .map(latestOf)
         .whereType<DocumentItem>()
         .toList();

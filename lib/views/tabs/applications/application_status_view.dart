@@ -39,12 +39,20 @@ class ApplicationStatusView extends StatelessWidget {
           sendsToOffice: documents.sendsToOffice,
         ),
     };
-    final toFix = states.entries
-        .where((e) =>
-            e.value == DocumentState.needsCorrection ||
-            e.value == DocumentState.rejected)
-        .map((e) => e.key)
-        .toList();
+    // Approved at the office with no papers on the server (an account
+    // registered at the office): there is nothing to count or to send.
+    final registeredAtOffice =
+        stage == ApplicationStage.approved && status.documents.isEmpty;
+
+    // The papers the office asked for again, else the ones it turned down.
+    final toFix = status.reuploadTypes.isNotEmpty
+        ? status.reuploadTypes
+        : states.entries
+            .where((e) =>
+                e.value == DocumentState.needsCorrection ||
+                e.value == DocumentState.rejected)
+            .map((e) => e.key)
+            .toList();
 
     return Scaffold(
       appBar: AppTheme.appBar('Application status'),
@@ -137,30 +145,57 @@ class ApplicationStatusView extends StatelessWidget {
                 (event) => _HistoryTile(event: event, dateFormat: dateFormat),
               ),
             const SizedBox(height: 28),
-            SectionTitle(
-              'Your documents (${documents.requiredDoneCount} of '
-              '${DocumentRepository.requiredTypes.length} sent)',
-              fontSize: 22,
-            ),
-            const SizedBox(height: 12),
-            for (final type in DocumentRepository.requiredTypes)
-              _PaperRow(
-                type: type,
-                state: states[type]!,
-                note: status.reviewOf(type)?.note ?? '',
+            if (registeredAtOffice) ...[
+              const SectionTitle('Your documents', fontSize: 22),
+              const SizedBox(height: 12),
+              const Text(
+                'Your papers were checked at the OSCA office.',
+                style: TextStyle(
+                  fontSize: 18,
+                  color: AppColors.textPrimary,
+                  height: 1.4,
+                ),
               ),
+            ] else ...[
+              SectionTitle(
+                'Your documents (${documents.sentCount(status)} of '
+                '${DocumentRepository.requiredTypes.length} sent)',
+                fontSize: 22,
+              ),
+              const SizedBox(height: 12),
+              for (final type in DocumentRepository.requiredTypes)
+                _PaperRow(
+                  type: type,
+                  state: states[type]!,
+                  note: status.reviewOf(type)?.note ?? '',
+                ),
+            ],
             const SizedBox(height: 20),
-            BigButton(
-              label: stage == ApplicationStage.needsAction ||
-                      stage == ApplicationStage.rejected
-                  ? 'Upload / resubmit documents'
-                  : 'Upload documents',
-              icon: Icons.upload_file_outlined,
-              style: stage.canSubmit
-                  ? BigButtonStyle.filled
-                  : BigButtonStyle.tonal,
-              onPressed: () => context.push(Routes.upload),
-            ),
+            if (status.canUpload)
+              BigButton(
+                label: stage == ApplicationStage.needsAction ||
+                        stage == ApplicationStage.rejected
+                    ? 'Upload / resubmit documents'
+                    : 'Upload documents',
+                icon: Icons.upload_file_outlined,
+                style: stage.canSubmit
+                    ? BigButtonStyle.filled
+                    : BigButtonStyle.tonal,
+                onPressed: () => context.push(Routes.upload),
+              )
+            else if (!registeredAtOffice)
+              const InfoCard(
+                outlined: true,
+                child: Text(
+                  'Your papers were sent. The OSCA office will tell you if '
+                  'they need a new photo.',
+                  style: TextStyle(
+                    fontSize: 17,
+                    color: AppColors.textPrimary,
+                    height: 1.4,
+                  ),
+                ),
+              ),
           ],
         ),
       ),

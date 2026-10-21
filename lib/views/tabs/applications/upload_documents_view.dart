@@ -79,19 +79,30 @@ class _UploadDocumentsViewState extends State<UploadDocumentsView> {
     if (choice == _PhotoChoice.retake) return _capture(type, source);
     if (choice != _PhotoChoice.send) return;
 
-    setState(() => _busyType = type);
-    final item = await documents.add(type, bytes);
-    if (!mounted) return;
-    setState(() => _busyType = null);
-    _sayResult(type, item);
+    final photo = bytes;
+    await _send(type, () => documents.add(type, photo));
   }
 
-  Future<void> _resend(DocumentItem item) async {
-    setState(() => _busyType = item.type);
-    final result = await context.read<DocumentRepository>().upload(item);
-    if (!mounted) return;
-    setState(() => _busyType = null);
-    _sayResult(item.type, result);
+  Future<void> _resend(DocumentItem item) => _send(
+        item.type,
+        () => context.read<DocumentRepository>().upload(item),
+      );
+
+  /// Sends a photo, or sends it again. When the office refuses it (422), its
+  /// own message is shown as it is.
+  Future<void> _send(
+    DocumentType type,
+    Future<DocumentItem> Function() send,
+  ) async {
+    setState(() => _busyType = type);
+    try {
+      final item = await send();
+      if (mounted) _sayResult(type, item);
+    } on ApiException catch (e) {
+      if (mounted) _say(e.message);
+    } finally {
+      if (mounted) setState(() => _busyType = null);
+    }
   }
 
   void _sayResult(DocumentType type, DocumentItem item) {
@@ -161,7 +172,8 @@ class _UploadDocumentsViewState extends State<UploadDocumentsView> {
     try {
       // The OSCA office needs the name and birthday with the application.
       if (profile != null) await users.syncProfile(profile);
-      final reference = await documents.submitApplication();
+      final reference =
+          await documents.submitApplication(applications.status);
       await applications.markSubmitted(reference);
       if (!mounted) return;
       // Only reached with the OSCA office's own reference number.
@@ -218,6 +230,12 @@ class _UploadDocumentsViewState extends State<UploadDocumentsView> {
           sendsToOffice: documents.sendsToOffice,
         );
 
+    // Approved at the office with no papers on the server (an account
+    // registered at the office): there is nothing to count or to send.
+    final registeredAtOffice =
+        stage == ApplicationStage.approved && status.documents.isEmpty;
+    final papersNeeded = DocumentRepository.requiredFor(status);
+
     return Scaffold(
       appBar: AppTheme.appBar('Upload documents'),
       body: ListView(
@@ -239,54 +257,70 @@ class _UploadDocumentsViewState extends State<UploadDocumentsView> {
             ),
             const SizedBox(height: 16),
           ],
-          const Text(
-            'Take a clear photo of each paper. Put it on a table, in good '
-                'light, and make sure all the words can be read.',
-            style: TextStyle(fontSize: 18, color: AppColors.textPrimary, height: 1.4),
-          ),
-          const SizedBox(height: 12),
-          Text(
-            '${documents.requiredDoneCount} of '
-                '${DocumentRepository.requiredTypes.length} papers '
-                'sent',
-            style: const TextStyle(
-              fontSize: 20,
-              fontWeight: FontWeight.w700,
-              color: AppColors.primary,
+          if (status.canUpload && !registeredAtOffice) ...[
+            const Text(
+              'Take a clear photo of each paper. Put it on a table, in good '
+                  'light, and make sure all the words can be read.',
+              style: TextStyle(fontSize: 18, color: AppColors.textPrimary, height: 1.4),
             ),
-          ),
-          const SizedBox(height: 16),
-          for (final type in DocumentRepository.requiredTypes) ...[
-            _DocumentCard(
-              type: type,
-              item: documents.latestOf(type),
-              state: stateOf(type),
-              note: status.reviewOf(type)?.note ?? '',
-              busy: _busyType == type,
-              onCamera: () => _capture(type, ImageSource.camera),
-              onGallery: () => _capture(type, ImageSource.gallery),
-              onResend: _resend,
-            ),
-            const SizedBox(height: 14),
+            const SizedBox(height: 12),
           ],
+          if (registeredAtOffice)
+            const Text(
+              'Your papers were checked at the OSCA office.',
+              style: TextStyle(
+                fontSize: 20,
+                fontWeight: FontWeight.w700,
+                color: AppColors.primary,
+              ),
+            )
+          else
+            Text(
+              '${documents.sentCount(status)} of '
+                  '${DocumentRepository.requiredTypes.length} papers '
+                  'sent',
+              style: const TextStyle(
+                fontSize: 20,
+                fontWeight: FontWeight.w700,
+                color: AppColors.primary,
+              ),
+            ),
+          const SizedBox(height: 16),
+          if (!registeredAtOffice)
+            for (final type in DocumentRepository.requiredTypes) ...[
+              _DocumentCard(
+                type: type,
+                item: documents.latestOf(type),
+                state: stateOf(type),
+                note: status.reviewOf(type)?.note ?? '',
+                busy: _busyType == type,
+                canSend: status.canUploadType(type),
+                onCamera: () => _capture(type, ImageSource.camera),
+                onGallery: () => _capture(type, ImageSource.gallery),
+                onResend: _resend,
+              ),
+              const SizedBox(height: 14),
+            ],
           const SizedBox(height: 10),
-          if (stage.canSubmit) ...[
+          if (status.canUpload && !registeredAtOffice) ...[
             BigButton(
               label: _submitting ? 'Sending...' : 'Send my application',
               icon: Icons.send_outlined,
-              onPressed: (documents.hasAllRequired && !_submitting && _busyType == null)
+              onPressed: (documents.readyToSubmit(status) && !_submitting && _busyType == null)
                   ? _submit
                   : null,
             ),
-            if (!documents.hasAllRequired) ...[
+            if (!documents.readyToSubmit(status)) ...[
               const SizedBox(height: 10),
-              const Text(
-                'Send all the papers above first.',
+              Text(
+                papersNeeded.length == DocumentRepository.requiredTypes.length
+                    ? 'Send all the papers above first.'
+                    : 'Send the new photos the OSCA office asked for first.',
                 textAlign: TextAlign.center,
-                style: TextStyle(fontSize: 17, color: AppColors.textSecondary),
+                style: const TextStyle(fontSize: 17, color: AppColors.textSecondary),
               ),
             ],
-          ] else
+          ] else if (!registeredAtOffice)
             const InfoCard(
               outlined: true,
               child: Row(
@@ -296,8 +330,8 @@ class _UploadDocumentsViewState extends State<UploadDocumentsView> {
                   SizedBox(width: 12),
                   Expanded(
                     child: Text(
-                      'Your application was already sent. You can still '
-                          'replace a paper if the OSCA office asks you to.',
+                      'Your papers were sent. The OSCA office will tell you if '
+                          'they need a new photo.',
                       style: TextStyle(
                         fontSize: 17,
                         color: AppColors.textPrimary,
@@ -322,6 +356,10 @@ class _DocumentCard extends StatelessWidget {
   /// The office's note about this paper, if any.
   final String note;
   final bool busy;
+
+  /// The senior may send or replace this paper now. When not, the card only
+  /// shows its status.
+  final bool canSend;
   final VoidCallback onCamera;
   final VoidCallback onGallery;
   final ValueChanged<DocumentItem> onResend;
@@ -332,6 +370,7 @@ class _DocumentCard extends StatelessWidget {
     required this.state,
     required this.note,
     required this.busy,
+    required this.canSend,
     required this.onCamera,
     required this.onGallery,
     required this.onResend,
@@ -340,8 +379,9 @@ class _DocumentCard extends StatelessWidget {
   @override
   Widget build(BuildContext context) {
     final current = item;
-    final fix = state == DocumentState.needsCorrection ||
-        state == DocumentState.rejected;
+    final fix = canSend &&
+        (state == DocumentState.needsCorrection ||
+            state == DocumentState.rejected);
     return InfoCard(
       outlined: !fix,
       padding: const EdgeInsets.all(18),
@@ -402,7 +442,7 @@ class _DocumentCard extends StatelessWidget {
           const SizedBox(height: 14),
           if (busy)
             const Center(child: CircularProgressIndicator())
-          else ...[
+          else if (canSend) ...[
             if (state == DocumentState.notSent && current != null) ...[
               BigButton(
                 label: 'Send again',

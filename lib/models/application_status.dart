@@ -1,3 +1,4 @@
+import '../utils/manila_time.dart';
 import 'document_item.dart';
 
 /// Where the Senior Citizen ID application is.
@@ -81,7 +82,7 @@ class StatusEvent {
   factory StatusEvent.fromJson(Map<String, dynamic> json) {
     return StatusEvent(
       stage: ApplicationStageText.parse(json['stage'] as String?),
-      date: DateTime.tryParse(json['date'] as String? ?? '') ?? DateTime.now(),
+      date: parseServerTime(json['date'] as String?) ?? DateTime.now(),
       note: json['note'] as String? ?? '',
     );
   }
@@ -94,10 +95,18 @@ class ApplicationStatus {
   final DateTime? updatedAt;
   final List<StatusEvent> history;
 
-  /// The office's decision on each paper. Optional: the backend does not
-  /// send per-paper results yet (it only has one note for the whole
-  /// application), so this is usually empty and [message] explains instead.
+  /// The papers the OSCA office has, with its decision on each one (GET
+  /// /application "documents"). Empty when the office has none, e.g. an
+  /// account registered at the office.
   final List<DocumentReview> documents;
+
+  /// May the senior send or replace papers now? The server decides: true
+  /// before a first submission, or when the office asked for new photos.
+  final bool canUpload;
+
+  /// The papers the office asked to be sent again. Empty when it asked for
+  /// none (then a first submission needs all the papers).
+  final List<DocumentType> reuploadTypes;
 
   const ApplicationStatus({
     required this.applicationNo,
@@ -106,6 +115,8 @@ class ApplicationStatus {
     this.updatedAt,
     this.history = const [],
     this.documents = const [],
+    this.canUpload = false,
+    this.reuploadTypes = const [],
   });
 
   /// The office's latest decision on [type], or null.
@@ -116,10 +127,17 @@ class ApplicationStatus {
     return null;
   }
 
+  /// May the senior send or replace this paper? Only when uploading is
+  /// allowed, and, after a request for new photos, only for the papers asked
+  /// for.
+  bool canUploadType(DocumentType type) =>
+      canUpload && (reuploadTypes.isEmpty || reuploadTypes.contains(type));
+
   factory ApplicationStatus.empty() => const ApplicationStatus(
     applicationNo: '',
     stage: ApplicationStage.notStarted,
     message: 'Send photos of your papers to start your application.',
+    canUpload: true,
   );
 
   ApplicationStatus copyWith({
@@ -129,6 +147,8 @@ class ApplicationStatus {
     DateTime? updatedAt,
     List<StatusEvent>? history,
     List<DocumentReview>? documents,
+    bool? canUpload,
+    List<DocumentType>? reuploadTypes,
   }) {
     return ApplicationStatus(
       applicationNo: applicationNo ?? this.applicationNo,
@@ -137,6 +157,8 @@ class ApplicationStatus {
       updatedAt: updatedAt ?? this.updatedAt,
       history: history ?? this.history,
       documents: documents ?? this.documents,
+      canUpload: canUpload ?? this.canUpload,
+      reuploadTypes: reuploadTypes ?? this.reuploadTypes,
     );
   }
 
@@ -147,16 +169,23 @@ class ApplicationStatus {
     'updatedAt': updatedAt?.toIso8601String(),
     'history': history.map((e) => e.toJson()).toList(),
     'documents': documents.map((e) => e.toJson()).toList(),
+    'canUpload': canUpload,
+    'reuploadTypes': reuploadTypes.map((t) => t.name).toList(),
   };
 
+  /// A saved copy from before [canUpload] existed reads the old way: the
+  /// stage decides whether papers can be sent.
   factory ApplicationStatus.fromJson(Map<String, dynamic> json) {
     final rawHistory = json['history'];
     final rawDocuments = json['documents'];
+    final rawReupload = json['reuploadTypes'];
+    final stage = ApplicationStageText.parse(json['stage'] as String?);
+    final canUpload = json['canUpload'];
     return ApplicationStatus(
       applicationNo: json['applicationNo'] as String? ?? '',
-      stage: ApplicationStageText.parse(json['stage'] as String?),
+      stage: stage,
       message: json['message'] as String? ?? '',
-      updatedAt: DateTime.tryParse(json['updatedAt'] as String? ?? ''),
+      updatedAt: parseServerTime(json['updatedAt'] as String?),
       history: rawHistory is List
           ? rawHistory
           .whereType<Map>()
@@ -168,6 +197,14 @@ class ApplicationStatus {
           .whereType<Map>()
           .map((e) => DocumentReview.tryFromJson(Map<String, dynamic>.from(e)))
           .whereType<DocumentReview>()
+          .toList()
+          : const [],
+      canUpload: canUpload is bool ? canUpload : stage.canSubmit,
+      reuploadTypes: rawReupload is List
+          ? rawReupload
+          .whereType<String>()
+          .map((s) => DocumentTypeInfo.parse(s))
+          .whereType<DocumentType>()
           .toList()
           : const [],
     );
@@ -183,13 +220,30 @@ class AppNotification {
   final DateTime date;
   final bool read;
 
+  /// The Medical or Burial request it is about (its reference),
+  /// so the message can open it. Empty for other messages.
+  final String requestReference;
+
+  /// The request was approved and has a certificate to show at the office.
+  final bool hasCertificate;
+
+  /// What kind of message it is: "greeting" for a birthday greeting from the
+  /// OSCA office, "" for everything else.
+  final String kind;
+
   const AppNotification({
     required this.id,
     required this.title,
     required this.body,
     required this.date,
     this.read = false,
+    this.requestReference = '',
+    this.hasCertificate = false,
+    this.kind = '',
   });
+
+  /// A birthday greeting from the OSCA office.
+  bool get isGreeting => kind == 'greeting';
 
   AppNotification copyWith({bool? read}) => AppNotification(
     id: id,
@@ -197,6 +251,9 @@ class AppNotification {
     body: body,
     date: date,
     read: read ?? this.read,
+    requestReference: requestReference,
+    hasCertificate: hasCertificate,
+    kind: kind,
   );
 
   Map<String, dynamic> toJson() => {
@@ -205,15 +262,26 @@ class AppNotification {
     'body': body,
     'date': date.toIso8601String(),
     'read': read,
+    'request': requestReference.isEmpty ? null : {'reference': requestReference},
+    'hasCertificate': hasCertificate,
+    'kind': kind,
   };
 
+  /// The backend sends {"id", "title", "body", "date"}, plus for an
+  /// assistance decision "request": {"kind", "reference"} and
+  /// "hasCertificate", and "kind": "greeting" for a birthday greeting.
   factory AppNotification.fromJson(Map<String, dynamic> json) {
+    final request = json['request'];
     return AppNotification(
       id: json['id'] as String? ?? '',
       title: json['title'] as String? ?? '',
       body: json['body'] as String? ?? '',
-      date: DateTime.tryParse(json['date'] as String? ?? '') ?? DateTime.now(),
+      date: parseServerTime(json['date'] as String?) ?? DateTime.now(),
       read: json['read'] as bool? ?? false,
+      requestReference:
+          request is Map ? (request['reference'] as String? ?? '') : '',
+      hasCertificate: json['hasCertificate'] as bool? ?? false,
+      kind: json['kind'] as String? ?? '',
     );
   }
 }

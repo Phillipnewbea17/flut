@@ -142,7 +142,7 @@ class _SeniorApplicationCard extends StatelessWidget {
             ),
             const SizedBox(height: 10),
             BigButton(
-              label: stage.canSubmit ? 'Fix my documents' : 'My documents',
+              label: status.canUpload ? 'Fix my documents' : 'My documents',
               icon: Icons.upload_file_outlined,
               style: BigButtonStyle.tonal,
               onPressed: () => context.push(Routes.upload),
