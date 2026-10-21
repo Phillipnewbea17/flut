@@ -1,9 +1,12 @@
 import 'package:flutter/material.dart';
+import 'package:go_router/go_router.dart';
 import 'package:intl/intl.dart';
 import 'package:provider/provider.dart';
 
 import '../../../models/application_status.dart';
 import '../../../repositories/application_repository.dart';
+import '../../../repositories/requests_repository.dart';
+import '../../../routes/app_router.dart';
 import '../../../theme/app_colors.dart';
 import '../../../theme/app_theme.dart';
 import '../../../widgets/info_card.dart';
@@ -51,7 +54,12 @@ class _NotificationsViewState extends State<NotificationsView> {
   Future<void> _open(AppNotification item) async {
     // Opening a message clears its NEW mark (and the bell count).
     context.read<ApplicationRepository>().markRead(item.id);
-    await showDialog<void>(
+    // A pension release is on the Benefits tab.
+    if (item.id.startsWith('pension-')) {
+      context.go(Routes.benefitsTab);
+      return;
+    }
+    final openRequest = await showDialog<bool>(
       context: context,
       builder: (dialogContext) => AlertDialog(
         title: Text(item.title, style: const TextStyle(fontSize: 22)),
@@ -63,12 +71,30 @@ class _NotificationsViewState extends State<NotificationsView> {
         ),
         actions: [
           TextButton(
-            onPressed: () => Navigator.of(dialogContext).pop(),
+            onPressed: () => Navigator.of(dialogContext).pop(false),
             child: const Text('Close', style: TextStyle(fontSize: 18)),
           ),
+          // An assistance decision opens its request; an approved one
+          // shows the certificate there.
+          if (item.requestReference.isNotEmpty)
+            TextButton(
+              onPressed: () => Navigator.of(dialogContext).pop(true),
+              child: Text(
+                item.hasCertificate ? 'View certificate' : 'Open request',
+                style: const TextStyle(fontSize: 18, fontWeight: FontWeight.w700),
+              ),
+            ),
         ],
       ),
     );
+    if (openRequest != true || !mounted) return;
+
+    // The saved copy may be older than this message: refresh it on the way.
+    final requests = context.read<RequestsRepository>();
+    requests.load();
+    context.push(item.hasCertificate
+        ? Routes.certificate(item.requestReference)
+        : Routes.request(item.requestReference));
   }
 
   void _delete(AppNotification item) {
@@ -395,8 +421,10 @@ class _NotificationTile extends StatelessWidget {
                   color: AppColors.primaryLight,
                   shape: BoxShape.circle,
                 ),
-                child: const Icon(Icons.notifications_none,
-                    color: AppColors.primary, size: 26),
+                child: Icon(
+                    item.isGreeting ? Icons.cake : Icons.notifications_none,
+                    color: AppColors.primary,
+                    size: 26),
               ),
               const SizedBox(width: 14),
               Expanded(
@@ -421,8 +449,11 @@ class _NotificationTile extends StatelessWidget {
                     const SizedBox(height: 4),
                     Text(
                       item.body,
-                      maxLines: 3,
-                      overflow: TextOverflow.ellipsis,
+                      // A greeting is short and is read in full.
+                      maxLines: item.isGreeting ? null : 3,
+                      overflow: item.isGreeting
+                          ? TextOverflow.visible
+                          : TextOverflow.ellipsis,
                       style: const TextStyle(
                         fontSize: 17,
                         color: AppColors.textPrimary,

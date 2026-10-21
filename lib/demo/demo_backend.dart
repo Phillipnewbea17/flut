@@ -136,6 +136,12 @@ class DemoBackend extends http.BaseClient {
         return _updateProfile(email, account, body);
       case 'GET /notifications':
         return _Reply(200, _notifications(account));
+      case 'POST /notifications/read':
+        return _markNotifications(account, body, 'read', true);
+      case 'POST /notifications/dismiss':
+        return _markNotifications(account, body, 'dismissed', true);
+      case 'POST /notifications/restore':
+        return _markNotifications(account, body, 'dismissed', false);
       case 'GET /application':
         return _Reply(200, _application(account));
       case 'POST /documents':
@@ -165,8 +171,9 @@ class DemoBackend extends http.BaseClient {
         return _Reply(201, {'ok': true, 'reference': _next('COR-DEMO')});
     }
 
-    // Requests: /medical-requests, /burial-requests, /help-requests,
-    // /senior-id/replacement-requests (and their /{ref}/attachments).
+    // Requests: /medical-requests, /burial-requests, /help-requests, /senior-id/replacement-requests (and their
+    // /{ref}/attachments). They stay Pending: no office decides in demo
+    // mode, so no certificate is ever issued here.
     for (final kind in _requestKinds.keys) {
       if (path == kind) {
         if (method == 'GET') return _Reply(200, _requests(account, kind));
@@ -236,7 +243,9 @@ class DemoBackend extends http.BaseClient {
           'This email address is already registered. Please log in instead.');
     }
 
-    _accounts[email] = {
+    // Typed on purpose: an untyped literal becomes Map<String, Object>, and
+    // _checkPassword writes null into it.
+    _accounts[email] = <String, dynamic>{
       'password': password,
       'failedLogins': 0,
       // DEMO: nothing can send an email or open a web page here, so the
@@ -379,6 +388,8 @@ class DemoBackend extends http.BaseClient {
         'identityStatus': a['linked'] == true ? 'verified' : 'unverified',
         'registrationStatus': a['linked'] == true ? 'Active' : '',
         'photoUrl': '',
+        'hasPhoto': false,
+        'photoVersion': '',
       };
 
   _Reply _updateProfile(
@@ -435,6 +446,7 @@ class DemoBackend extends http.BaseClient {
       'idNumber': a['seniorId'],
       'fullName': _fullName(a),
       'birthDate': a['birthDate'],
+      'purok': 'Purok 3',
       'address': 'Purok 3, Poblacion, Ubay, Bohol',
       'issuedBy': 'OSCA (demo)',
       'issuedAt': '${a['createdAt']}'.substring(0, 10),
@@ -446,6 +458,7 @@ class DemoBackend extends http.BaseClient {
   List<Map<String, dynamic>> _pension(Map<String, dynamic> a) {
     _seniorId(a); // linked only, like the real backend
     final year = DateTime.now().year;
+    // Released by the office; no amounts, like the real backend.
     return [
       {
         'period': 'July–September $year',
@@ -491,7 +504,53 @@ class DemoBackend extends http.BaseClient {
     return _Reply(201, {'ok': true, 'reference': reference});
   }
 
+  /// The bell list with the account's marks, like the real backend: deleted
+  /// messages left out, read ones with "read": true.
   List<Map<String, dynamic>> _notifications(Map<String, dynamic> a) {
+    final read = _marks(a, 'read');
+    final dismissed = _marks(a, 'dismissed');
+    return [
+      for (final n in _allNotifications(a))
+        if (!dismissed.contains(n['id']))
+          {...n, if (read.contains(n['id'])) 'read': true},
+    ];
+  }
+
+  /// The ids marked "read" or "dismissed" on this account. Kept with the
+  /// account, so logging out and in again keeps them.
+  Set<String> _marks(Map<String, dynamic> a, String kind) => {
+        ...((a['notificationMarks'] as Map?)?[kind] as List? ?? const [])
+            .whereType<String>(),
+      };
+
+  /// POST /notifications/read, /dismiss and /restore, with the same body
+  /// and checks as Mobile\NotificationController: ids not in the account's
+  /// list are left out.
+  _Reply _markNotifications(
+      Map<String, dynamic> a, Map<String, dynamic> body, String kind, bool on) {
+    final ids = body['ids'];
+    if (ids is! List ||
+        ids.isEmpty ||
+        ids.length > 200 ||
+        ids.any((id) => id is! String || id.isEmpty || id.length > 100)) {
+      throw const _Reply(422, {'message': 'The ids field must be a list of message ids.'});
+    }
+    final own = _allNotifications(a).map((n) => n['id']).toSet();
+    final applied = ids.cast<String>().toSet().where(own.contains).toList();
+    final marks = _marks(a, kind);
+    if (on) {
+      marks.addAll(applied);
+    } else {
+      marks.removeAll(applied);
+    }
+    a['notificationMarks'] = {
+      ...Map<String, dynamic>.from((a['notificationMarks'] as Map?) ?? {}),
+      kind: marks.toList(),
+    };
+    return _Reply(200, {'ok': true, 'ids': applied});
+  }
+
+  List<Map<String, dynamic>> _allNotifications(Map<String, dynamic> a) {
     final items = <Map<String, dynamic>>[
       {
         'id': 'demo-welcome',
